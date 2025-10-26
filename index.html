@@ -6,8 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>PDF Flipbook Viewer</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
+    <script src="https://unpkg.com/page-flip/dist/js/page-flip.browser.js"></script>
     <style>
         * {
             -webkit-touch-callout: none;
@@ -29,26 +28,8 @@
             overflow: hidden;
             -webkit-overflow-scrolling: touch;
         }
-        #flipbook {
+        #book {
             margin: auto;
-            position: relative;
-            touch-action: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-        #flipbook .page {
-            background-color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-        }
-        #flipbook .page img {
-            max-width: 100%;
-            max-height: 100%;
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            pointer-events: none;
         }
         .loading {
             position: absolute;
@@ -67,7 +48,7 @@
 </head>
 <body>
 <div id="loading" class="loading">Loading pages...</div>
-<div id="flipbook" style="display: none;"></div>
+<div id="book"></div>
 <script>
     (async function() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -78,7 +59,7 @@
             return;
         }
 
-        const flipbook = document.getElementById('flipbook');
+        const bookContainer = document.getElementById('book');
         const loading = document.getElementById('loading');
         let pageIndex = 0;
         const pages = [];
@@ -109,165 +90,90 @@
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
         
-        // Determine if we're on mobile or desktop
-        const isMobile = viewportWidth <= 768;
-        let pageWidth, pageHeight, flipbookWidth;
+        let pageWidth, pageHeight;
         
-        if (isMobile) {
-            // Mobile: single page view - prioritize height to show full page
+        // Calculate page size to fit viewport
+        pageWidth = Math.floor(viewportWidth / 2.5);
+        pageHeight = Math.floor(pageWidth / pageAspectRatio);
+        
+        // Ensure it fits in viewport
+        if (pageHeight > viewportHeight * 0.9) {
             pageHeight = Math.floor(viewportHeight * 0.9);
             pageWidth = Math.floor(pageHeight * pageAspectRatio);
-            
-            // If page is too wide, constrain by width
-            if (pageWidth > viewportWidth * 0.9) {
-                pageWidth = Math.floor(viewportWidth * 0.9);
-                pageHeight = Math.floor(pageWidth / pageAspectRatio);
-            }
-            
-            flipbookWidth = pageWidth; // Single page width
-        } else {
-            // Desktop: double page spread
-            pageWidth = Math.floor(viewportWidth / 2.5);
-            pageHeight = Math.floor(pageWidth / pageAspectRatio);
-            
-            // Ensure it fits in viewport
-            if (pageHeight > viewportHeight * 0.9) {
-                pageHeight = Math.floor(viewportHeight * 0.9);
-                pageWidth = Math.floor(pageHeight * pageAspectRatio);
-            }
-            
-            flipbookWidth = pageWidth * 2; // Double page width
         }
 
-        // Add pages to flipbook
-        pages.forEach((pageUrl) => {
-            const pageDiv = document.createElement('div');
-            pageDiv.className = 'page';
-            
-            const img = document.createElement('img');
-            img.src = pageUrl;
-            img.alt = 'Page';
-            
-            pageDiv.appendChild(img);
-            flipbook.appendChild(pageDiv);
+        // Initialize PageFlip
+        const pageFlip = new St.PageFlip(bookContainer, {
+            width: pageWidth,
+            height: pageHeight,
+            size: "fixed",
+            minWidth: 315,
+            maxWidth: 1000,
+            minHeight: 400,
+            maxHeight: 1533,
+            showCover: false,
+            drawShadow: true,
+            flippingTime: 1000,
+            usePortrait: true,
+            startZIndex: 0,
+            autoSize: true,
+            maxShadowOpacity: 0.5,
+            mobileScrollSupport: true
         });
+
+        // Load images
+        pageFlip.loadFromImages(pages);
 
         loading.style.display = 'none';
-        flipbook.style.display = 'block';
-
-        // Wait for images to load before initializing turn.js
-        const imagePromises = pages.map(pageUrl => {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = resolve;
-                img.onerror = resolve;
-                img.src = pageUrl;
-            });
-        });
-
-        await Promise.all(imagePromises);
-
-        // Initialize turn.js with mobile-friendly settings
-        $('#flipbook').turn({
-            width: flipbookWidth,
-            height: pageHeight,
-            autoCenter: true,
-            display: isMobile ? 'single' : 'double',
-            acceleration: true,
-            gradients: !isMobile,
-            elevation: 50,
-            page: 1,
-            when: {
-                turning: function(event, page, view) {
-                    console.log('Turning to page:', page);
-                },
-                turned: function(event, page, view) {
-                    console.log('Turned to page:', page);
-                }
-            }
-        });
-
-        // For mobile: add explicit touch event handling to ensure swiping works
-        if (isMobile) {
-            let touchStartX = 0;
-            let touchStartY = 0;
-            let touchStartTime = 0;
-            
-            flipbook.addEventListener('touchstart', function(e) {
-                touchStartX = e.touches[0].clientX;
-                touchStartY = e.touches[0].clientY;
-                touchStartTime = Date.now();
-            }, false);
-            
-            flipbook.addEventListener('touchmove', function(e) {
-                // Prevent default scrolling
-                e.preventDefault();
-            }, false);
-            
-            flipbook.addEventListener('touchend', function(e) {
-                if (!e.changedTouches || !e.changedTouches[0]) return;
-                
-                const touchEndX = e.changedTouches[0].clientX;
-                const touchEndY = e.changedTouches[0].clientY;
-                const touchEndTime = Date.now();
-                const deltaX = touchEndX - touchStartX;
-                const deltaY = touchEndY - touchStartY;
-                const deltaTime = touchEndTime - touchStartTime;
-                
-                console.log('Touch delta:', { deltaX, deltaY, deltaTime });
-                
-                // Only process horizontal swipes (not vertical scrolls)
-                // Must be quick (< 500ms) and primarily horizontal
-                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 30 && deltaTime < 500) {
-                    e.preventDefault();
-                    console.log('Swipe detected:', deltaX > 0 ? 'right' : 'left');
-                    
-                    if (deltaX > 0) {
-                        // Swipe right - go to previous page
-                        $('#flipbook').turn('previous');
-                    } else {
-                        // Swipe left - go to next page
-                        $('#flipbook').turn('next');
-                    }
-                }
-            }, false);
-        }
 
         // Handle window resize
+        let resizeTimeout;
         window.addEventListener('resize', function() {
-            const newViewportWidth = window.innerWidth;
-            const newViewportHeight = window.innerHeight;
-            const newIsMobile = newViewportWidth <= 768;
-            
-            let newPageWidth, newPageHeight, newFlipbookWidth;
-            
-            if (newIsMobile) {
-                // Mobile: single page - prioritize height
-                newPageHeight = Math.floor(newViewportHeight * 0.9);
-                newPageWidth = Math.floor(newPageHeight * pageAspectRatio);
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                const newViewportWidth = window.innerWidth;
+                const newViewportHeight = window.innerHeight;
                 
-                if (newPageWidth > newViewportWidth * 0.9) {
-                    newPageWidth = Math.floor(newViewportWidth * 0.9);
-                    newPageHeight = Math.floor(newPageWidth / pageAspectRatio);
-                }
-                
-                newFlipbookWidth = newPageWidth;
-            } else {
-                // Desktop: double page spread
-                newPageWidth = Math.floor(newViewportWidth / 2.5);
-                newPageHeight = Math.floor(newPageWidth / pageAspectRatio);
+                let newPageWidth = Math.floor(newViewportWidth / 2.5);
+                let newPageHeight = Math.floor(newPageWidth / pageAspectRatio);
                 
                 if (newPageHeight > newViewportHeight * 0.9) {
                     newPageHeight = Math.floor(newViewportHeight * 0.9);
                     newPageWidth = Math.floor(newPageHeight * pageAspectRatio);
                 }
                 
-                newFlipbookWidth = newPageWidth * 2;
-            }
-            
-            $('#flipbook').turn('display', newIsMobile ? 'single' : 'double');
-            $('#flipbook').turn('size', newFlipbookWidth, newPageHeight);
+                // Recreate the book with new dimensions
+                const currentPage = pageFlip.getCurrentPageIndex();
+                pageFlip.destroy();
+                
+                const newPageFlip = new St.PageFlip(bookContainer, {
+                    width: newPageWidth,
+                    height: newPageHeight,
+                    size: "fixed",
+                    minWidth: 315,
+                    maxWidth: 1000,
+                    minHeight: 400,
+                    maxHeight: 1533,
+                    showCover: false,
+                    drawShadow: true,
+                    flippingTime: 1000,
+                    usePortrait: true,
+                    startZIndex: 0,
+                    autoSize: true,
+                    maxShadowOpacity: 0.5,
+                    mobileScrollSupport: true
+                });
+                
+                newPageFlip.loadFromImages(pages);
+                newPageFlip.turnToPage(currentPage);
+                
+                // Update reference
+                window.pageFlip = newPageFlip;
+            }, 250);
         });
+        
+        // Store reference for resize
+        window.pageFlip = pageFlip;
     })();
 </script>
 </body>
