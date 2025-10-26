@@ -18,19 +18,18 @@
             overflow: hidden;
         }
         #flipbook {
-            width: 100%;
-            height: 100%;
+            margin: auto;
+        }
+        #flipbook .page {
+            background-color: white;
             display: flex;
             justify-content: center;
             align-items: center;
         }
-        .page {
-            width: 100%;
-            height: 100%;
-            background-color: white;
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
+        #flipbook .page img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
         }
         .loading {
             position: absolute;
@@ -38,6 +37,11 @@
             left: 50%;
             transform: translate(-50%, -50%);
             font-size: 1.5rem;
+        }
+        .error {
+            color: white;
+            text-align: center;
+            padding: 20px;
         }
     </style>
 </head>
@@ -50,14 +54,16 @@
         const dir = urlParams.get('dir');
 
         if (!dir) {
-            document.body.innerHTML = '<h1 style="color: white; text-align: center;">No directory specified. Use ?dir=example</h1>';
+            document.body.innerHTML = '<div class="error"><h1>No directory specified. Use ?dir=example</h1></div>';
             return;
         }
 
         const flipbook = document.getElementById('flipbook');
         const loading = document.getElementById('loading');
         let pageIndex = 0;
+        const pages = [];
 
+        // Load all pages first
         while (true) {
             const pageUrl = `pdfs/${dir}/page_${String(pageIndex).padStart(2, '0')}.jpg`;
 
@@ -66,30 +72,99 @@
                 if (!response.ok) {
                     break;
                 }
-
-                const pageDiv = document.createElement('div');
-                pageDiv.className = 'page';
-                pageDiv.style.backgroundImage = `url(${pageUrl})`;
-                flipbook.appendChild(pageDiv);
-
+                pages.push(pageUrl);
                 pageIndex++;
             } catch (error) {
                 break;
             }
         }
 
-        if (pageIndex === 0) {
-            document.body.innerHTML = '<h1 style="color: white; text-align: center;">No pages found in the specified directory.</h1>';
+        if (pages.length === 0) {
+            document.body.innerHTML = '<div class="error"><h1>No pages found in the specified directory.</h1></div>';
             return;
         }
+
+        // Calculate dimensions - use a standard aspect ratio for pages
+        const pageAspectRatio = 3 / 4; // width / height for typical document
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // For double-page spread (desktop), use half width for each page
+        let pageWidth, pageHeight;
+        
+        if (viewportWidth > 768) {
+            // Desktop: show double pages
+            pageWidth = Math.floor(viewportWidth / 2.5);
+            pageHeight = Math.floor(pageWidth / pageAspectRatio);
+            
+            // Ensure it fits in viewport
+            if (pageHeight > viewportHeight * 0.9) {
+                pageHeight = Math.floor(viewportHeight * 0.9);
+                pageWidth = Math.floor(pageHeight * pageAspectRatio);
+            }
+        } else {
+            // Mobile: single page
+            pageWidth = Math.floor(viewportWidth * 0.9);
+            pageHeight = Math.floor(pageWidth / pageAspectRatio);
+            
+            if (pageHeight > viewportHeight * 0.9) {
+                pageHeight = Math.floor(viewportHeight * 0.9);
+                pageWidth = Math.floor(pageHeight * pageAspectRatio);
+            }
+        }
+
+        // Add pages to flipbook
+        pages.forEach((pageUrl) => {
+            const pageDiv = document.createElement('div');
+            pageDiv.className = 'page';
+            
+            const img = document.createElement('img');
+            img.src = pageUrl;
+            img.alt = 'Page';
+            
+            pageDiv.appendChild(img);
+            flipbook.appendChild(pageDiv);
+        });
 
         loading.style.display = 'none';
         flipbook.style.display = 'block';
 
+        // Initialize turn.js
         $('#flipbook').turn({
-            width: window.innerWidth,
-            height: window.innerHeight,
-            autoCenter: true
+            width: pageWidth * 2,
+            height: pageHeight,
+            autoCenter: true,
+            acceleration: true,
+            gradients: true,
+            elevation: 50
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            const newViewportWidth = window.innerWidth;
+            const newViewportHeight = window.innerHeight;
+            
+            let newPageWidth, newPageHeight;
+            
+            if (newViewportWidth > 768) {
+                newPageWidth = Math.floor(newViewportWidth / 2.5);
+                newPageHeight = Math.floor(newPageWidth / pageAspectRatio);
+                
+                if (newPageHeight > newViewportHeight * 0.9) {
+                    newPageHeight = Math.floor(newViewportHeight * 0.9);
+                    newPageWidth = Math.floor(newPageHeight * pageAspectRatio);
+                }
+            } else {
+                newPageWidth = Math.floor(newViewportWidth * 0.9);
+                newPageHeight = Math.floor(newPageWidth / pageAspectRatio);
+                
+                if (newPageHeight > newViewportHeight * 0.9) {
+                    newPageHeight = Math.floor(newViewportHeight * 0.9);
+                    newPageWidth = Math.floor(newPageHeight * pageAspectRatio);
+                }
+            }
+            
+            $('#flipbook').turn('size', newPageWidth * 2, newPageHeight);
         });
     })();
 </script>
