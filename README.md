@@ -2,6 +2,12 @@
 
 A simple, static HTML + JS project that displays pre-rendered PDF pages as a swipable flipbook with smooth animation. Optimized for mobile Safari (iPhone/iPad) and desktop browsers, hosted on GitHub Pages.
 
+## 🌐 Live Demo
+
+**Access the viewer at:** `https://alexey-matjuk.github.io/pdf-viewer/?dir=example`
+
+Replace `example` with any PDF folder name you've added to the `pdfs/` directory.
+
 ## Features
 
 - 📱 **Mobile-first design** - Works smoothly on iPhone/iPad Safari and desktop browsers
@@ -13,29 +19,20 @@ A simple, static HTML + JS project that displays pre-rendered PDF pages as a swi
 
 ## Quick Start
 
-### View the Flipbook
+### How to Open the PDF Viewer
 
-Once deployed, access your viewer with:
+1. **Open in your browser:** Visit `https://alexey-matjuk.github.io/pdf-viewer/?dir=example`
+2. **View different documents:** Change the `dir` parameter to match any folder in `pdfs/`
+   - Example: `https://alexey-matjuk.github.io/pdf-viewer/?dir=mydoc`
+3. **Navigate pages:** Swipe on mobile or click page edges on desktop
 
-```
-https://<username>.github.io/pdf-viewer/?dir=example
-```
+## First-Time Setup (One-Time)
 
-Replace `example` with the name of any folder you've created under `pdfs/`.
+GitHub Pages is automatically deployed via GitHub Actions. The workflow deploys whenever you push to the `main` branch.
 
-## Setup Instructions
+## Adding Your Own PDF Documents
 
-### 1. Enable GitHub Pages
-
-1. Go to your repository on GitHub
-2. Click **Settings** → **Pages**
-3. Under **Source**, select:
-   - Branch: `main` (or `master`)
-   - Folder: `/ (root)`
-4. Click **Save**
-5. Your site will be published at `https://<username>.github.io/pdf-viewer/`
-
-### 2. Prepare Your PDF Images
+### 1. Prepare Your PDF Images
 
 Convert your PDF to JPG images using ImageMagick:
 
@@ -56,7 +53,7 @@ This will create:
 
 **Note:** Files must follow the naming pattern `page_XX.jpg` where `XX` is a zero-padded number starting from `00`.
 
-### 3. Upload Images to GitHub
+### 2. Upload Images to GitHub
 
 Create the folder structure:
 
@@ -95,12 +92,12 @@ git commit -m "Add mydoc PDF images"
 git push
 ```
 
-### 4. View Your Flipbook
+### 3. View Your Document
 
 Open your browser and navigate to:
 
 ```
-https://<username>.github.io/pdf-viewer/?dir=mydoc
+https://alexey-matjuk.github.io/pdf-viewer/?dir=mydoc
 ```
 
 ## Usage
@@ -113,13 +110,13 @@ https://<username>.github.io/pdf-viewer/?dir=mydoc
 
 ```
 # Load the example document
-https://<username>.github.io/pdf-viewer/?dir=example
+https://alexey-matjuk.github.io/pdf-viewer/?dir=example
 
 # Load a different document
-https://<username>.github.io/pdf-viewer/?dir=annual-report
+https://alexey-matjuk.github.io/pdf-viewer/?dir=annual-report
 
 # Load another document
-https://<username>.github.io/pdf-viewer/?dir=presentation
+https://alexey-matjuk.github.io/pdf-viewer/?dir=presentation
 ```
 
 ## How It Works
