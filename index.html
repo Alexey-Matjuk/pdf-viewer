@@ -7,29 +7,45 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/4/turn.min.js"></script>
     <style>
+        * {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
         body {
             margin: 0;
+            padding: 0;
             background-color: #121212;
             color: white;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
+            width: 100vw;
             overflow: hidden;
+            -webkit-overflow-scrolling: touch;
         }
         #flipbook {
             margin: auto;
+            position: relative;
+            touch-action: pan-x;
         }
         #flipbook .page {
             background-color: white;
             display: flex;
             justify-content: center;
             align-items: center;
+            overflow: hidden;
         }
         #flipbook .page img {
             max-width: 100%;
             max-height: 100%;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
+            pointer-events: none;
         }
         .loading {
             position: absolute;
@@ -37,6 +53,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             font-size: 1.5rem;
+            z-index: 1000;
         }
         .error {
             color: white;
@@ -84,8 +101,8 @@
             return;
         }
 
-        // Calculate dimensions - use a standard aspect ratio for pages
-        const pageAspectRatio = 3 / 4; // width / height for typical document
+        // Calculate dimensions - use actual image aspect ratio (800x1200 = portrait)
+        const pageAspectRatio = 2 / 3; // width / height for portrait pages (800/1200)
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
         
@@ -94,13 +111,14 @@
         let pageWidth, pageHeight, flipbookWidth;
         
         if (isMobile) {
-            // Mobile: single page view
-            pageWidth = Math.floor(viewportWidth * 0.9);
-            pageHeight = Math.floor(pageWidth / pageAspectRatio);
+            // Mobile: single page view - prioritize height to show full page
+            pageHeight = Math.floor(viewportHeight * 0.9);
+            pageWidth = Math.floor(pageHeight * pageAspectRatio);
             
-            if (pageHeight > viewportHeight * 0.9) {
-                pageHeight = Math.floor(viewportHeight * 0.9);
-                pageWidth = Math.floor(pageHeight * pageAspectRatio);
+            // If page is too wide, constrain by width
+            if (pageWidth > viewportWidth * 0.9) {
+                pageWidth = Math.floor(viewportWidth * 0.9);
+                pageHeight = Math.floor(pageWidth / pageAspectRatio);
             }
             
             flipbookWidth = pageWidth; // Single page width
@@ -134,16 +152,67 @@
         loading.style.display = 'none';
         flipbook.style.display = 'block';
 
-        // Initialize turn.js
+        // Wait for images to load before initializing turn.js
+        const imagePromises = pages.map(pageUrl => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = resolve;
+                img.onerror = resolve;
+                img.src = pageUrl;
+            });
+        });
+
+        await Promise.all(imagePromises);
+
+        // Initialize turn.js with mobile-friendly settings
         $('#flipbook').turn({
             width: flipbookWidth,
             height: pageHeight,
             autoCenter: true,
+            display: isMobile ? 'single' : 'double',
             acceleration: true,
-            gradients: true,
+            gradients: !isMobile,
             elevation: 50,
-            display: isMobile ? 'single' : 'double'
+            when: {
+                turning: function(event, page, view) {
+                    // Allow page turning
+                },
+                turned: function(event, page, view) {
+                    // Page turned successfully
+                }
+            }
         });
+
+        // For mobile: add explicit touch event handling to ensure swiping works
+        if (isMobile) {
+            let touchStartX = 0;
+            let touchStartY = 0;
+            
+            flipbook.addEventListener('touchstart', function(e) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }, { passive: true });
+            
+            flipbook.addEventListener('touchend', function(e) {
+                if (!e.changedTouches || !e.changedTouches[0]) return;
+                
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                const deltaX = touchEndX - touchStartX;
+                const deltaY = touchEndY - touchStartY;
+                
+                // Only process horizontal swipes (not vertical scrolls)
+                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+                    if (deltaX > 0) {
+                        // Swipe right - go to previous page
+                        $('#flipbook').turn('previous');
+                    } else {
+                        // Swipe left - go to next page
+                        $('#flipbook').turn('next');
+                    }
+                }
+            }, { passive: true });
+        }
 
         // Handle window resize
         window.addEventListener('resize', function() {
@@ -154,13 +223,13 @@
             let newPageWidth, newPageHeight, newFlipbookWidth;
             
             if (newIsMobile) {
-                // Mobile: single page
-                newPageWidth = Math.floor(newViewportWidth * 0.9);
-                newPageHeight = Math.floor(newPageWidth / pageAspectRatio);
+                // Mobile: single page - prioritize height
+                newPageHeight = Math.floor(newViewportHeight * 0.9);
+                newPageWidth = Math.floor(newPageHeight * pageAspectRatio);
                 
-                if (newPageHeight > newViewportHeight * 0.9) {
-                    newPageHeight = Math.floor(newViewportHeight * 0.9);
-                    newPageWidth = Math.floor(newPageHeight * pageAspectRatio);
+                if (newPageWidth > newViewportWidth * 0.9) {
+                    newPageWidth = Math.floor(newViewportWidth * 0.9);
+                    newPageHeight = Math.floor(newPageWidth / pageAspectRatio);
                 }
                 
                 newFlipbookWidth = newPageWidth;
