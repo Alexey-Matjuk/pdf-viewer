@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>PDF Flipbook Viewer</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/4/turn.min.js"></script>
@@ -30,7 +32,8 @@
         #flipbook {
             margin: auto;
             position: relative;
-            touch-action: pan-x;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
         }
         #flipbook .page {
             background-color: white;
@@ -173,12 +176,13 @@
             acceleration: true,
             gradients: !isMobile,
             elevation: 50,
+            page: 1,
             when: {
                 turning: function(event, page, view) {
-                    // Allow page turning
+                    console.log('Turning to page:', page);
                 },
                 turned: function(event, page, view) {
-                    // Page turned successfully
+                    console.log('Turned to page:', page);
                 }
             }
         });
@@ -187,22 +191,37 @@
         if (isMobile) {
             let touchStartX = 0;
             let touchStartY = 0;
+            let touchStartTime = 0;
             
             flipbook.addEventListener('touchstart', function(e) {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
-            }, { passive: true });
+                touchStartTime = Date.now();
+            }, false);
+            
+            flipbook.addEventListener('touchmove', function(e) {
+                // Prevent default scrolling
+                e.preventDefault();
+            }, false);
             
             flipbook.addEventListener('touchend', function(e) {
                 if (!e.changedTouches || !e.changedTouches[0]) return;
                 
                 const touchEndX = e.changedTouches[0].clientX;
                 const touchEndY = e.changedTouches[0].clientY;
+                const touchEndTime = Date.now();
                 const deltaX = touchEndX - touchStartX;
                 const deltaY = touchEndY - touchStartY;
+                const deltaTime = touchEndTime - touchStartTime;
+                
+                console.log('Touch delta:', { deltaX, deltaY, deltaTime });
                 
                 // Only process horizontal swipes (not vertical scrolls)
-                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+                // Must be quick (< 500ms) and primarily horizontal
+                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 30 && deltaTime < 500) {
+                    e.preventDefault();
+                    console.log('Swipe detected:', deltaX > 0 ? 'right' : 'left');
+                    
                     if (deltaX > 0) {
                         // Swipe right - go to previous page
                         $('#flipbook').turn('previous');
@@ -211,7 +230,7 @@
                         $('#flipbook').turn('next');
                     }
                 }
-            }, { passive: true });
+            }, false);
         }
 
         // Handle window resize
