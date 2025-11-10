@@ -1,0 +1,33 @@
+{
+  "name": "pdf-flipbook-viewer",
+  "version": "2.0.0",
+  "description": "Professional PDF flipbook viewer with realistic page-turning animations",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "start": "npx http-server -p 8000 -c-1",
+    "dev": "npx http-server -p 8000 -c-1 -o"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alexey-Matjuk/pdf-viewer.git"
+  },
+  "keywords": [
+    "pdf",
+    "flipbook",
+    "page-flip",
+    "viewer",
+    "magazine",
+    "catalog",
+    "responsive",
+    "vanilla-javascript"
+  ],
+  "author": "Alexey Matjuk",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Alexey-Matjuk/pdf-viewer/issues"
+  },
+  "homepage": "https://github.com/Alexey-Matjuk/pdf-viewer#readme",
+  "dependencies": {},
+  "devDependencies": {}
+}
