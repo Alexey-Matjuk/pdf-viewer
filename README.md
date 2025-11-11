@@ -6,8 +6,6 @@ A professional, responsive PDF flipbook viewer with realistic page-turning anima
 
 **Access the viewer at:** `https://alexey-matjuk.github.io/pdf-viewer/`
 
-## 🚀 Quick Start
-
 ## 📚 Adding Your Own Documents
 
 ### 1. Convert PDF to Images
@@ -34,6 +32,20 @@ assets/
 
 **Note:** Images must be named `page_00.jpg`, `page_01.jpg`, etc. (with zero-padding).
 
-## 🙏 Credits
+## 🔨 Development
 
-- Built with [StPageFlip](https://nodlik.github.io/StPageFlip/) by Nodlik
+### Building the StPageFlip Library
+
+This project uses [StPageFlip](https://github.com/Alexey-Matjuk/StPageFlip). The library is pre-built and included in `src/lib/`.
+
+To update to the latest version from the fork:
+
+```bash
+./scripts/build-pageflip.sh
+```
+
+This script will:
+1. Clone the fork
+2. Build the library
+3. Copy the built files to `src/lib/`
+4. Clean up temporary files

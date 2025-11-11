@@ -18,11 +18,9 @@ export const CONFIG = {
     PAGEFLIP_OPTIONS: {
         size: "fixed",
         showCover: false,
-        drawShadow: true,
-        flippingTime: 1000,
+        flippingTime: 2000,
         startZIndex: 0,
-        autoSize: true,
         mobileScrollSupport: true,
-        usePortrait: true
+        usePortrait: false
     }
 };
