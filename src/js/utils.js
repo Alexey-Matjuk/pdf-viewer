@@ -5,14 +5,6 @@
 import { CONFIG } from './config.js';
 
 /**
- * Get URL parameters from the current page
- * @returns {URLSearchParams} URL parameters object
- */
-export function getUrlParams() {
-    return new URLSearchParams(window.location.search);
-}
-
-/**
  * Generate page URL based on index
  * @param {number} index - Page index
  * @returns {string} Full page URL
@@ -30,7 +22,10 @@ export function getPageUrl(index) {
 export async function urlExists(url) {
     try {
         const response = await fetch(url, { method: 'HEAD' });
-        return response.ok;
+        // Check both status and content-type to ensure it's actually an image
+        const contentType = response.headers.get('content-type');
+        const isImage = contentType && contentType.startsWith('image/');
+        return response.ok && isImage;
     } catch (error) {
         return false;
     }
@@ -43,70 +38,24 @@ export async function urlExists(url) {
 export async function loadPageUrls() {
     const pages = [];
     let pageIndex = 0;
+    const MAX_PAGES = 1000; // Safety limit
 
-    while (true) {
+    console.log('loadPageUrls: Starting to check for pages...');
+
+    while (pageIndex < MAX_PAGES) {
         const pageUrl = getPageUrl(pageIndex);
         const exists = await urlExists(pageUrl);
         
         if (!exists) {
+            console.log(`Stopping at page ${pageIndex}, no more pages found`);
             break;
         }
         
+        console.log(`Found page ${pageIndex}: ${pageUrl}`);
         pages.push(pageUrl);
         pageIndex++;
     }
 
+    console.log('Total pages found:', pages.length);
     return pages;
-}
-
-/**
- * Load template HTML from file
- * @param {string} templatePath - Path to template file
- * @returns {Promise<string>} Template HTML content
- */
-export async function loadTemplate(templatePath) {
-    const response = await fetch(templatePath);
-    if (!response.ok) {
-        throw new Error(`Failed to load template: ${templatePath}`);
-    }
-    return await response.text();
-}
-
-/**
- * Get image aspect ratio
- * @param {string} imageUrl - URL of the image
- * @returns {Promise<number>} Aspect ratio (width/height)
- */
-export async function getImageAspectRatio(imageUrl) {
-    return new Promise((resolve) => {
-        const img = new Image();
-        
-        img.onload = () => {
-            resolve(img.width / img.height);
-        };
-        
-        img.onerror = () => {
-            resolve(1);
-        };
-        
-        img.src = imageUrl;
-    });
-}
-
-/**
- * Show error message to user
- * @param {string} message - Error message to display
- */
-export function showError(message) {
-    document.body.innerHTML = `<div class="error"><h1>${message}</h1></div>`;
-}
-
-/**
- * Hide loading screen
- */
-export function hideLoading() {
-    const loading = document.getElementById('loading');
-    if (loading) {
-        loading.style.display = 'none';
-    }
 }

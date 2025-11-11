@@ -1,6 +1,6 @@
 # PDF Flipbook Viewer
 
-A professional, responsive PDF flipbook viewer with realistic page-turning animations. Perfect for displaying magazines, catalogs, brochures, and other multi-page documents on the web.
+A professional, responsive PDF flipbook viewer with realistic page-turning animations built with Vue 3 and flipbook-vue. Perfect for displaying magazines, catalogs, brochures, and other multi-page documents on the web.
 
 ## 🌐 Live Demo
 
@@ -20,32 +20,43 @@ magick convert -density 150 your-document.pdf -quality 90 page_%02d.jpg
 
 ### 2. Add Images to Assets
 
-Place your converted images in the `assets/` directory:
+Place your converted images in the `public/assets/` directory:
 
 ```
-assets/
-├── page_00.jpg
-├── page_01.jpg
-├── page_02.jpg
-└── ...
+public/
+└── assets/
+    ├── page_00.jpg
+    ├── page_01.jpg
+    ├── page_02.jpg
+    └── ...
 ```
 
 **Note:** Images must be named `page_00.jpg`, `page_01.jpg`, etc. (with zero-padding).
 
 ## 🔨 Development
 
-### Building the StPageFlip Library
-
-This project uses [StPageFlip](https://github.com/Alexey-Matjuk/StPageFlip). The library is pre-built and included in `src/lib/`.
-
-To update to the latest version from the fork:
+### Setup
 
 ```bash
-./scripts/build-pageflip.sh
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
 ```
 
-This script will:
-1. Clone the fork
-2. Build the library
-3. Copy the built files to `src/lib/`
-4. Clean up temporary files
+### Build for Production
+
+```bash
+# Create production build
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+## 🛠️ Technology Stack
+
+- **Vue 3** - Progressive JavaScript framework
+- **flipbook-vue** - 3D page flip component
+- **Vite** - Next generation frontend tooling

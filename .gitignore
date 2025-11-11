@@ -37,8 +37,6 @@ yarn-error.log*
 *.tmp
 *.temp
 .cache/
-temp-pageflip/
-StPageFlip-dev/
 
 # Test files (optional, uncomment if needed)
 # test/
