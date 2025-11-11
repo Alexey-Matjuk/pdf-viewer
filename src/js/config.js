@@ -3,8 +3,8 @@
  */
 
 export const CONFIG = {
-    // Directory path for PDF pages
-    PAGES_BASE_PATH: 'assets',
+    // Directory path for PDF pages (uses Vite's base URL)
+    PAGES_BASE_PATH: `${import.meta.env.BASE_URL}assets`,
     
     // Page file naming pattern
     PAGE_FILE_PREFIX: 'page_',
