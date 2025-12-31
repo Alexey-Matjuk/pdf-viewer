@@ -18,41 +18,11 @@ const app = createApp({
             pages: [],
             error: null,
             isFullscreen: false,
-            canFullscreen: false,
-            backgroundColor: '#333',
             lastHeight: 0
         };
     },
     async mounted() {
         console.log('Vue app mounted successfully');
-        
-        // Get background color from URL parameter
-        const urlParams = new URLSearchParams(window.location.search);
-        const bgColor = urlParams.get('bgColor');
-        if (bgColor) {
-            // Handle color keywords (transparent, etc.) and hex colors
-            this.backgroundColor = bgColor.startsWith('#') || /^[a-z]+$/i.test(bgColor) 
-                ? bgColor 
-                : `#${bgColor}`;
-        }
-        
-        // Apply background color to body and app container
-        document.body.style.backgroundColor = this.backgroundColor;
-        this.$nextTick(() => {
-            if (this.$el) {
-                this.$el.style.backgroundColor = this.backgroundColor;
-            }
-        });
-        
-        // Check if fullscreen is allowed
-        this.canFullscreen = !!(
-            document.fullscreenEnabled || 
-            document.webkitFullscreenEnabled || 
-            document.mozFullScreenEnabled || 
-            document.msFullscreenEnabled
-        );
-        console.log('Fullscreen enabled:', this.canFullscreen);
-
         await this.loadPages();
         
         // Send initial height to parent window (for iframe embedding)
@@ -272,29 +242,22 @@ const app = createApp({
                                     disabled: !slotProps.canZoomIn,
                                     title: 'Zoom In',
                                     innerHTML: '<svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>'
-                                }),
-
-                                // Fullscreen button - only show if allowed
-                                ...(this.canFullscreen ? [
-                                    // Separator
-                                    h('div', { class: 'separator' }),
-                                    
-                                    // Fullscreen Button
-                                    h('button', {
-                                        class: 'control-btn',
-                                        onClick: (e) => {
-                                            e.stopPropagation();
-                                            this.toggleFullscreen();
-                                        },
-                                        title: this.isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen',
-                                        innerHTML: this.isFullscreen 
-                                            ? '<svg viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>'
-                                            : '<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>'
-                                    })
-                                ] : [])
+                                })
                             ])
                         ];
                     }
+                }),
+                // Fullscreen button
+                h('button', {
+                    class: 'fullscreen-btn',
+                    onClick: (e) => {
+                        e.stopPropagation(); // Prevent triggering page flip
+                        this.toggleFullscreen();
+                    },
+                    title: this.isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen',
+                    innerHTML: this.isFullscreen 
+                        ? '<svg viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>'
+                        : '<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>'
                 })
             ]);
         }
