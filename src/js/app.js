@@ -193,7 +193,7 @@ const app = createApp({
         
         if (this.pages.length > 0) {
             console.log('Rendering flipbook with pages:', this.pages.length);
-            return h('div', { style: { width: '100%', height: '100%', position: 'relative' } }, [
+            return h('div', { style: { backgroundColor: this.backgroundColor, width: '100%', height: '100%', position: 'relative' } }, [
                 h(Flipbook, {
                     class: 'flipbook',
                     pages: this.pages,

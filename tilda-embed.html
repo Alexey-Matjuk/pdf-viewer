@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tilda Lazy-Load Iframe Example</title>
+    <style>
+        .iframe-container {
+            position: relative;
+            width: 100%;
+            min-height: 600px;
+            background: #333;
+        }
+        
+        .iframe-loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 100%;
+            min-height: 600px;
+            border: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        iframe.loaded {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tilda Embed Example with Lazy Loading</h1>
+    
+    <!-- Copy this entire div block into your Tilda HTML block -->
+    <div class="iframe-container" id="flipbook-container">
+        <div class="iframe-loader">Loading flipbook...</div>
+        <iframe 
+            id="flipbook-iframe"
+            data-src="https://pdf-viewer-eight-tawny.vercel.app/?bgColor=transparent"
+            allowfullscreen>
+        </iframe>
+    </div>
+
+    <script>
+        // Lazy load iframe after page is ready
+        (function() {
+            function loadIframe() {
+                const iframe = document.getElementById('flipbook-iframe');
+                const loader = document.querySelector('.iframe-loader');
+                const dataSrc = iframe.getAttribute('data-src');
+                
+                if (dataSrc) {
+                    iframe.src = dataSrc;
+                    
+                    // Hide loader when iframe loads
+                    iframe.addEventListener('load', function() {
+                        iframe.classList.add('loaded');
+                        if (loader) loader.style.display = 'none';
+                    });
+                    
+                    // Also hide loader after timeout (in case load event doesn't fire)
+                    setTimeout(function() {
+                        if (loader) loader.style.display = 'none';
+                        iframe.classList.add('loaded');
+                    }, 3000);
+                }
+            }
+            
+            // Load iframe after DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadIframe);
+            } else {
+                // DOM already loaded
+                setTimeout(loadIframe, 100);
+            }
+        })();
+    </script>
+
+    <h2>Alternative: Even Simpler Version</h2>
+    <p>If the above doesn't work, try this minimal version:</p>
+    
+    <!-- Minimal version - just delayed loading -->
+    <div id="simple-container" style="min-height: 600px; background: #333;">
+        <div id="simple-loader" style="color: white; text-align: center; padding: 50px;">Loading...</div>
+    </div>
+
+    <script>
+        // Super simple delayed iframe injection
+        setTimeout(function() {
+            const container = document.getElementById('simple-container');
+            const loader = document.getElementById('simple-loader');
+            
+            if (loader) loader.remove();
+            
+            const iframe = document.createElement('iframe');
+            iframe.src = 'https://pdf-viewer-eight-tawny.vercel.app/?bgColor=transparent';
+            iframe.style.width = '100%';
+            iframe.style.height = '600px';
+            iframe.style.border = 'none';
+            iframe.setAttribute('allowfullscreen', '');
+            
+            container.appendChild(iframe);
+        }, 500); // Wait 500ms before loading
+    </script>
+</body>
+</html>
