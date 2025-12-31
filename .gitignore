@@ -40,3 +40,4 @@ yarn-error.log*
 # Test files (optional, uncomment if needed)
 # test/
 # coverage/
+.vercel
