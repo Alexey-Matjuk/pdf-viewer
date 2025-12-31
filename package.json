@@ -1,0 +1,40 @@
+{
+  "name": "pdf-flipbook-viewer",
+  "version": "2.0.0",
+  "description": "Professional PDF flipbook viewer with realistic page-turning animations",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "vite"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alexey-Matjuk/pdf-viewer.git"
+  },
+  "keywords": [
+    "pdf",
+    "flipbook",
+    "vue",
+    "flipbook-vue",
+    "viewer",
+    "magazine",
+    "catalog",
+    "responsive"
+  ],
+  "author": "Alexey Matjuk",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Alexey-Matjuk/pdf-viewer/issues"
+  },
+  "homepage": "https://github.com/Alexey-Matjuk/pdf-viewer#readme",
+  "dependencies": {
+    "@evomark/flipbook-vue": "^1.0.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "vite": "^7.2.2"
+  }
+}
