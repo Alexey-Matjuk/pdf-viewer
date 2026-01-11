@@ -85,7 +85,7 @@ brew install imagemagick  # macOS
 sudo apt-get install imagemagick  # Linux
 
 # Convert PDF to JPG (recommended settings)
-magick -density 150 your-document.pdf -quality 90 page_%02d.jpg
+magick -density 150 your-document.pdf -quality 90 -trim +repage page_%02d.jpg
 ```
 
 **Conversion Options:**
