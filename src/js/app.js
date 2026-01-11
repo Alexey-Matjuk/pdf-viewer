@@ -25,6 +25,10 @@ const app = createApp({
     async mounted() {
         console.log('Vue app mounted successfully');
         
+        // Detect if we're in an iframe and delay initialization
+        const isInIframe = window.self !== window.top;
+        const initDelay = isInIframe ? 300 : 0;
+        
         // Get background color from URL parameter
         const urlParams = new URLSearchParams(window.location.search);
         const bgColor = urlParams.get('bgColor');
@@ -42,6 +46,12 @@ const app = createApp({
                 this.$el.style.backgroundColor = this.backgroundColor;
             }
         });
+        
+        // Delay loading if in iframe to prevent SSR conflicts
+        if (initDelay > 0) {
+            console.log('Detected iframe embedding, delaying initialization by', initDelay, 'ms');
+            await new Promise(resolve => setTimeout(resolve, initDelay));
+        }
         
         await this.loadPages();
         
