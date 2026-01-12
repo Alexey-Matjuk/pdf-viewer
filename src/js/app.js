@@ -2,10 +2,59 @@
  * Main application entry point - Vue 3 App with flipbook-vue
  */
 
-// ==== PERSISTENT CRASH LOGGING ====
-// Logs survive page reloads/crashes via localStorage
+// ==== PERSISTENT CRASH LOGGING WITH VISUAL OVERLAY ====
+// Logs survive page reloads/crashes via localStorage AND display on screen
 
 const persistentLog = {
+  overlay: null,
+  logList: null,
+  
+  init() {
+    // Create visual overlay
+    this.overlay = document.createElement('div');
+    this.overlay.id = 'debug-overlay';
+    this.overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      max-height: 200px;
+      background: rgba(0,0,0,0.9);
+      color: #0f0;
+      font-family: monospace;
+      font-size: 10px;
+      padding: 5px;
+      z-index: 999999;
+      overflow-y: auto;
+      pointer-events: none;
+      border-bottom: 2px solid #0f0;
+    `;
+    
+    this.logList = document.createElement('div');
+    this.overlay.appendChild(this.logList);
+    document.body.appendChild(this.overlay);
+    
+    // Show previous crash logs
+    const previousLogs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
+    if (previousLogs.length > 0) {
+      const crashHeader = document.createElement('div');
+      crashHeader.style.cssText = 'color: #f00; font-weight: bold; margin-bottom: 5px; font-size: 12px;';
+      crashHeader.textContent = '🚨 CRASH DETECTED - PREVIOUS SESSION LOGS:';
+      this.logList.appendChild(crashHeader);
+      
+      previousLogs.slice(-10).forEach(log => {
+        const logDiv = document.createElement('div');
+        logDiv.style.color = '#ff0';
+        logDiv.textContent = log;
+        this.logList.appendChild(logDiv);
+      });
+      
+      const divider = document.createElement('div');
+      divider.style.cssText = 'border-top: 1px solid #0f0; margin: 5px 0;';
+      this.logList.appendChild(divider);
+    }
+  },
+  
   add(type, message, data = {}) {
     const timestamp = new Date().toISOString().split('T')[1].substring(0, 12);
     const entry = `[${timestamp}] ${type} ${message} ${JSON.stringify(data)}`;
@@ -15,6 +64,22 @@ const persistentLog = {
       logs.push(entry);
       localStorage.setItem('crashLogs', JSON.stringify(logs.slice(-100))); // Keep last 100
       console[type === '⚠️' ? 'warn' : 'log'](type, message, data);
+      
+      // Add to visual overlay
+      if (this.logList) {
+        const logDiv = document.createElement('div');
+        logDiv.style.color = type === '⚠️' ? '#f80' : '#0f0';
+        logDiv.textContent = entry;
+        this.logList.appendChild(logDiv);
+        
+        // Auto-scroll to bottom
+        this.overlay.scrollTop = this.overlay.scrollHeight;
+        
+        // Keep only last 50 visible entries
+        while (this.logList.children.length > 50) {
+          this.logList.removeChild(this.logList.firstChild);
+        }
+      }
     } catch (e) {
       console.error('Log storage failed:', e);
     }
@@ -28,22 +93,18 @@ const persistentLog = {
   
   clear() {
     localStorage.removeItem('crashLogs');
+    if (this.logList) this.logList.innerHTML = '';
     console.log('🗑️ Logs cleared');
   }
 };
 
+// Initialize overlay immediately
+persistentLog.init();
+
 // Expose globally for manual inspection
 window.persistentLog = persistentLog;
 
-// Show previous session logs if any
-const previousLogs = localStorage.getItem('crashLogs');
-if (previousLogs) {
-  console.warn('⚠️⚠️⚠️ LOGS FROM PREVIOUS SESSION (LIKELY CRASH) - Run persistentLog.show() to view all');
-  const logs = JSON.parse(previousLogs);
-  console.log('Last 5 logs before crash:', logs.slice(-5));
-}
-
-persistentLog.add('✅', 'Session started');
+persistentLog.add('✅', 'Session started', { time: new Date().toISOString() });
 
 // ==== SIMPLE DEBUG LOGGING ====
 // Monitor critical events for debugging mobile zoom crash
