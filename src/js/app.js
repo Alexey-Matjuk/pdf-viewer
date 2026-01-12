@@ -2,6 +2,58 @@
  * Main application entry point - Vue 3 App with flipbook-vue
  */
 
+// ==== SIMPLE DEBUG LOGGING ====
+// Monitor critical events for debugging mobile zoom crash
+
+// Track gesture events (pinch/zoom)
+document.addEventListener('gesturestart', (e) => {
+    console.warn('🔍 GESTURE START - scale:', e.scale, 'rotation:', e.rotation);
+}, { passive: true });
+
+document.addEventListener('gesturechange', (e) => {
+    console.warn('🔍 GESTURE CHANGE - scale:', e.scale);
+}, { passive: true });
+
+document.addEventListener('gestureend', (e) => {
+    console.warn('🔍 GESTURE END - scale:', e.scale);
+}, { passive: true });
+
+// Monitor memory if available
+if (performance.memory) {
+    setInterval(() => {
+        const mem = performance.memory;
+        const usedMB = (mem.usedJSHeapSize / 1048576).toFixed(2);
+        const limitMB = (mem.jsHeapSizeLimit / 1048576).toFixed(2);
+        const percentage = ((mem.usedJSHeapSize / mem.jsHeapSizeLimit) * 100).toFixed(1);
+        console.log(`💾 Memory: ${usedMB}MB / ${limitMB}MB (${percentage}%)`);
+    }, 10000); // Every 10 seconds
+}
+
+// Detect page about to crash/reload
+window.addEventListener('beforeunload', (e) => {
+    console.error('⚠️ PAGE UNLOADING - Possible crash!');
+});
+
+window.addEventListener('pagehide', () => {
+    console.error('⚠️ PAGE HIDDEN - Possible crash!');
+});
+
+// Monitor resize events (can indicate zoom issues)
+let resizeCount = 0;
+window.addEventListener('resize', () => {
+    resizeCount++;
+    console.log(`📐 Resize #${resizeCount}: ${window.innerWidth}x${window.innerHeight}`);
+});
+
+// Catch errors
+window.addEventListener('error', (e) => {
+    console.error('❌ ERROR:', e.message, 'at', e.filename, 'line', e.lineno);
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+    console.error('❌ UNHANDLED REJECTION:', e.reason);
+});
+
 import { createApp, h } from 'vue';
 import Flipbook from '@evomark/flipbook-vue';
 import '../../node_modules/@evomark/flipbook-vue/dist/flipbook-vue.css';
@@ -23,7 +75,9 @@ const app = createApp({
         };
     },
     async mounted() {
-        console.log('Vue app mounted successfully');
+        console.log('✅ Vue app mounted');
+        console.log('📱 Device:', navigator.userAgent);
+        console.log('📐 Viewport:', `${window.innerWidth}x${window.innerHeight}`, 'Pixel ratio:', window.devicePixelRatio);
         
         // Detect if we're in an iframe and delay initialization
         const isInIframe = window.self !== window.top;
@@ -54,6 +108,12 @@ const app = createApp({
         }
         
         await this.loadPages();
+        
+        console.log('📚 Pages loaded:', this.pages.length);
+        if (performance.memory) {
+            const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
+            console.log('💾 Initial memory:', usedMB, 'MB');
+        }
         
         // Send initial height to parent window (for iframe embedding)
         this.$nextTick(() => {
@@ -170,6 +230,19 @@ const app = createApp({
             }
         },
         onFlipStart() {
+            const currentPage = this.$refs.flipbook?.page;
+            const totalPages = this.pages.length;
+            console.log(`📖 Flipping to page ${currentPage}/${totalPages}`);
+            
+            // Warn if on last few pages (where crashes are more common)
+            if (currentPage && currentPage >= totalPages - 3) {
+                console.warn(`⚠️ Near end of book - page ${currentPage}/${totalPages}`);
+                if (performance.memory) {
+                    const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
+                    console.warn('💾 Memory at:', usedMB, 'MB');
+                }
+            }
+            
             // Auto zoom out when flipping pages
             if (this.$refs.flipbook && this.$refs.flipbook.canZoomOut) {
                 this.$refs.flipbook.zoomOut();
@@ -255,6 +328,7 @@ const app = createApp({
                                     class: 'control-btn',
                                     onClick: (e) => {
                                         e.stopPropagation();
+                                        console.log('🔍 Zoom out - page', slotProps.page);
                                         slotProps.zoomOut();
                                     },
                                     disabled: !slotProps.canZoomOut,
@@ -267,6 +341,11 @@ const app = createApp({
                                     class: 'control-btn',
                                     onClick: (e) => {
                                         e.stopPropagation();
+                                        console.log('🔍 Zoom in - page', slotProps.page);
+                                        if (performance.memory) {
+                                            const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
+                                            console.log('💾 Memory:', usedMB, 'MB');
+                                        }
                                         slotProps.zoomIn();
                                     },
                                     disabled: !slotProps.canZoomIn,
