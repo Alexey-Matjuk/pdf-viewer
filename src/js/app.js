@@ -18,19 +18,66 @@ const persistentLog = {
       top: 0;
       left: 0;
       right: 0;
-      max-height: 200px;
-      background: rgba(0,0,0,0.9);
+      max-height: 40vh;
+      background: rgba(0,0,0,0.95);
       color: #0f0;
       font-family: monospace;
-      font-size: 10px;
-      padding: 5px;
+      font-size: 11px;
+      padding: 8px;
       z-index: 999999;
-      overflow-y: auto;
-      pointer-events: none;
-      border-bottom: 2px solid #0f0;
+      overflow-y: scroll;
+      -webkit-overflow-scrolling: touch;
+      pointer-events: auto;
+      border-bottom: 3px solid #0f0;
+      user-select: text;
+      -webkit-user-select: text;
     `;
     
+    // Add copy button
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋 COPY ALL';
+    copyBtn.style.cssText = `
+      position: sticky;
+      top: 0;
+      left: 0;
+      background: #0a0;
+      color: #000;
+      border: none;
+      padding: 8px 12px;
+      font-weight: bold;
+      font-size: 12px;
+      cursor: pointer;
+      margin-bottom: 8px;
+      z-index: 1;
+    `;
+    copyBtn.onclick = () => {
+      const logs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
+      const text = logs.join('\n');
+      
+      // Copy to clipboard
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+          copyBtn.textContent = '✅ COPIED!';
+          setTimeout(() => copyBtn.textContent = '📋 COPY ALL', 2000);
+        });
+      } else {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        copyBtn.textContent = '✅ COPIED!';
+        setTimeout(() => copyBtn.textContent = '📋 COPY ALL', 2000);
+      }
+    };
+    this.overlay.appendChild(copyBtn);
+    
     this.logList = document.createElement('div');
+    this.logList.style.cssText = 'user-select: text; -webkit-user-select: text;';
     this.overlay.appendChild(this.logList);
     document.body.appendChild(this.overlay);
     
@@ -38,20 +85,25 @@ const persistentLog = {
     const previousLogs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
     if (previousLogs.length > 0) {
       const crashHeader = document.createElement('div');
-      crashHeader.style.cssText = 'color: #f00; font-weight: bold; margin-bottom: 5px; font-size: 12px;';
+      crashHeader.style.cssText = 'color: #f00; font-weight: bold; margin-bottom: 5px; font-size: 13px; background: rgba(255,0,0,0.2); padding: 5px;';
       crashHeader.textContent = '🚨 CRASH DETECTED - PREVIOUS SESSION LOGS:';
       this.logList.appendChild(crashHeader);
       
-      previousLogs.slice(-10).forEach(log => {
+      previousLogs.slice(-15).forEach(log => {
         const logDiv = document.createElement('div');
-        logDiv.style.color = '#ff0';
+        logDiv.style.cssText = 'color: #ff0; padding: 2px 0; user-select: text; -webkit-user-select: text;';
         logDiv.textContent = log;
         this.logList.appendChild(logDiv);
       });
       
       const divider = document.createElement('div');
-      divider.style.cssText = 'border-top: 1px solid #0f0; margin: 5px 0;';
+      divider.style.cssText = 'border-top: 2px solid #f00; margin: 8px 0;';
       this.logList.appendChild(divider);
+      
+      const newSessionHeader = document.createElement('div');
+      newSessionHeader.style.cssText = 'color: #0f0; font-weight: bold; margin-bottom: 5px;';
+      newSessionHeader.textContent = '--- NEW SESSION ---';
+      this.logList.appendChild(newSessionHeader);
     }
   },
   
@@ -68,7 +120,7 @@ const persistentLog = {
       // Add to visual overlay
       if (this.logList) {
         const logDiv = document.createElement('div');
-        logDiv.style.color = type === '⚠️' ? '#f80' : '#0f0';
+        logDiv.style.cssText = `color: ${type === '⚠️' ? '#f80' : '#0f0'}; padding: 2px 0; user-select: text; -webkit-user-select: text;`;
         logDiv.textContent = entry;
         this.logList.appendChild(logDiv);
         
@@ -76,7 +128,7 @@ const persistentLog = {
         this.overlay.scrollTop = this.overlay.scrollHeight;
         
         // Keep only last 50 visible entries
-        while (this.logList.children.length > 50) {
+        while (this.logList.children.length > 60) {
           this.logList.removeChild(this.logList.firstChild);
         }
       }
