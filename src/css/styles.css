@@ -2,6 +2,35 @@
  * Global Styles for PDF Flipbook Viewer
  */
 
+/* Critical: Prevent iframe rendering issues during zoom */
+iframe {
+    /* Isolate iframe rendering to prevent crash */
+    isolation: isolate;
+    contain: layout style paint;
+    
+    /* Hardware acceleration hints */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    
+    /* Prevent flickering */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+/* During zoom gesture, simplify rendering */
+body.zooming iframe {
+    /* Temporarily disable complex rendering */
+    pointer-events: none;
+    will-change: auto;
+}
+
+body.zooming * {
+    /* Disable animations during zoom to reduce load */
+    animation-play-state: paused !important;
+    transition: none !important;
+}
+
 * {
     -webkit-touch-callout: none;
     -webkit-user-select: none;

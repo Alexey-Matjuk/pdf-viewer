@@ -161,29 +161,25 @@ persistentLog.add('✅', 'Session started', { time: new Date().toISOString() });
 // ==== SIMPLE DEBUG LOGGING ====
 // Monitor critical events for debugging mobile zoom crash
 
-// PREVENT gesture events that cause crashes (NOT passive - we need to preventDefault)
+// Track gesture events (don't prevent - just monitor)
 document.addEventListener('gesturestart', (e) => {
-    e.preventDefault();
-    persistentLog.add('🔍', 'GESTURE START BLOCKED', { scale: e.scale });
-}, { passive: false });
+    persistentLog.add('🔍', 'GESTURE START', { scale: e.scale, rotation: e.rotation });
+    // Optimize rendering during gesture
+    document.body.classList.add('zooming');
+}, { passive: true });
 
 document.addEventListener('gesturechange', (e) => {
-    e.preventDefault();
-    persistentLog.add('🔍', 'GESTURE CHANGE BLOCKED', { scale: e.scale });
-}, { passive: false });
+    // Only log every 5th event to reduce overhead
+    if (Math.random() < 0.2) {
+        persistentLog.add('🔍', 'GESTURE CHANGE', { scale: e.scale });
+    }
+}, { passive: true });
 
 document.addEventListener('gestureend', (e) => {
-    e.preventDefault();
-    persistentLog.add('🔍', 'GESTURE END BLOCKED', { scale: e.scale });
-}, { passive: false });
-
-// Also prevent touchmove with multiple touches (pinch detection)
-document.addEventListener('touchmove', (e) => {
-    if (e.touches.length > 1) {
-        e.preventDefault();
-        persistentLog.add('🔍', 'MULTI-TOUCH BLOCKED', { touches: e.touches.length });
-    }
-}, { passive: false });
+    persistentLog.add('🔍', 'GESTURE END', { scale: e.scale });
+    // Remove optimization class
+    document.body.classList.remove('zooming');
+}, { passive: true });
 
 // Monitor memory if available
 if (performance.memory) {
