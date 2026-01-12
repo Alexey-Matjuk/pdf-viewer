@@ -3,32 +3,35 @@
  */
 
 /* Critical: Prevent iframe rendering issues during zoom */
-iframe {
-    /* Isolate iframe rendering to prevent crash */
-    isolation: isolate;
-    contain: layout style paint;
+.flipbook-container {
+    /* Force GPU compositing for smoother zoom */
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+}
+
+/* Optimize images for mobile - reduce quality during zoom */
+img {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Use lower quality rendering on mobile */
+@media (max-width: 768px) {
+    img {
+        image-rendering: auto;
+    }
     
-    /* Hardware acceleration hints */
+    /* Limit max image size to reduce memory */
+    .flipbook img {
+        max-width: 100%;
+        height: auto;
+    }
+}
+
+iframe {
+    /* Simplified rendering hints */
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
-    will-change: transform;
-    
-    /* Prevent flickering */
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
-}
-
-/* During zoom gesture, simplify rendering */
-body.zooming iframe {
-    /* Temporarily disable complex rendering */
-    pointer-events: none;
-    will-change: auto;
-}
-
-body.zooming * {
-    /* Disable animations during zoom to reduce load */
-    animation-play-state: paused !important;
-    transition: none !important;
 }
 
 * {

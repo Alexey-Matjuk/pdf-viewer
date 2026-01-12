@@ -161,24 +161,20 @@ persistentLog.add('✅', 'Session started', { time: new Date().toISOString() });
 // ==== SIMPLE DEBUG LOGGING ====
 // Monitor critical events for debugging mobile zoom crash
 
-// Track gesture events (don't prevent - just monitor)
+// Track gesture events (monitor only)
 document.addEventListener('gesturestart', (e) => {
     persistentLog.add('🔍', 'GESTURE START', { scale: e.scale, rotation: e.rotation });
-    // Optimize rendering during gesture
-    document.body.classList.add('zooming');
 }, { passive: true });
 
 document.addEventListener('gesturechange', (e) => {
-    // Only log every 5th event to reduce overhead
-    if (Math.random() < 0.2) {
+    // Only log every 10th event to reduce overhead
+    if (Math.random() < 0.1) {
         persistentLog.add('🔍', 'GESTURE CHANGE', { scale: e.scale });
     }
 }, { passive: true });
 
 document.addEventListener('gestureend', (e) => {
     persistentLog.add('🔍', 'GESTURE END', { scale: e.scale });
-    // Remove optimization class
-    document.body.classList.remove('zooming');
 }, { passive: true });
 
 // Monitor memory if available
@@ -439,6 +435,10 @@ const app = createApp({
         
         if (this.pages.length > 0) {
             console.log('Rendering flipbook with pages:', this.pages.length);
+            
+            // Detect mobile device
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            
             return h('div', { style: { backgroundColor: this.backgroundColor, width: '100%', height: '100%', position: 'relative' } }, [
                 h(Flipbook, {
                     class: 'flipbook',
@@ -447,6 +447,12 @@ const app = createApp({
                     ambient: 1,
                     clickToZoom: false,
                     ref: 'flipbook',
+                    // Mobile optimization: reduce preload and rendering quality
+                    ...(isMobile ? {
+                        nPolygons: 3,  // Reduce 3D complexity
+                        perspective: 1000,  // Reduce perspective depth
+                        gloss: 0  // Disable glossy effects
+                    } : {}),
                     onFlipLeftStart: this.onFlipStart,
                     onFlipRightStart: this.onFlipStart
                 }, {
