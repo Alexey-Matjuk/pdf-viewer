@@ -381,8 +381,8 @@ const app = createApp({
                 // Initialize pages array with placeholders
                 this.pages = new Array(loadedPages.length).fill(placeholder);
                 
-                // Load first 3 pages immediately
-                this.loadPageRange(0, 2);
+                // Load first 6 pages immediately (for spread view)
+                this.loadPageRange(0, 5);
                 
                 this.loading = false;
                 
@@ -402,7 +402,7 @@ const app = createApp({
             // Load pages from start to end index
             for (let i = start; i <= end && i < this.allPageUrls.length; i++) {
                 if (this.pages[i] && this.pages[i].startsWith('data:image/gif')) {
-                    // Replace placeholder with actual page
+                    // Replace placeholder with actual page (Vue 3 has automatic reactivity)
                     this.pages[i] = this.allPageUrls[i];
                     persistentLog.add('📄', `Loaded page ${i + 1}`);
                 }
@@ -429,19 +429,20 @@ const app = createApp({
             this.currentPage = currentPage;
             persistentLog.add('📖', 'Flipping', { page: currentPage, total: totalPages });
             
-            // Load current page + 2 pages ahead, unload pages further back
-            const loadStart = Math.max(0, currentPage - 1);
-            const loadEnd = Math.min(totalPages - 1, currentPage + 2);
+            // Flipbook shows 2 pages at once (spread)
+            // Load current page + 3 pages on each side to be safe
+            const loadStart = Math.max(0, currentPage - 3);
+            const loadEnd = Math.min(totalPages - 1, currentPage + 4);
             
             // Load needed pages
             this.loadPageRange(loadStart, loadEnd);
             
-            // Unload pages that are far away (more than 3 pages away)
-            if (currentPage > 4) {
-                this.unloadPageRange(0, currentPage - 4);
+            // Unload pages that are far away (more than 6 pages away)
+            if (currentPage > 7) {
+                this.unloadPageRange(0, currentPage - 7);
             }
-            if (currentPage < totalPages - 4) {
-                this.unloadPageRange(currentPage + 4, totalPages - 1);
+            if (currentPage < totalPages - 7) {
+                this.unloadPageRange(currentPage + 7, totalPages - 1);
             }
             
             // Log memory
