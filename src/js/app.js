@@ -2,20 +2,63 @@
  * Main application entry point - Vue 3 App with flipbook-vue
  */
 
+// ==== PERSISTENT CRASH LOGGING ====
+// Logs survive page reloads/crashes via localStorage
+
+const persistentLog = {
+  add(type, message, data = {}) {
+    const timestamp = new Date().toISOString().split('T')[1].substring(0, 12);
+    const entry = `[${timestamp}] ${type} ${message} ${JSON.stringify(data)}`;
+    
+    try {
+      const logs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
+      logs.push(entry);
+      localStorage.setItem('crashLogs', JSON.stringify(logs.slice(-100))); // Keep last 100
+      console[type === '⚠️' ? 'warn' : 'log'](type, message, data);
+    } catch (e) {
+      console.error('Log storage failed:', e);
+    }
+  },
+  
+  show() {
+    const logs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
+    console.log('📋 FULL CRASH HISTORY:\n' + logs.join('\n'));
+    return logs;
+  },
+  
+  clear() {
+    localStorage.removeItem('crashLogs');
+    console.log('🗑️ Logs cleared');
+  }
+};
+
+// Expose globally for manual inspection
+window.persistentLog = persistentLog;
+
+// Show previous session logs if any
+const previousLogs = localStorage.getItem('crashLogs');
+if (previousLogs) {
+  console.warn('⚠️⚠️⚠️ LOGS FROM PREVIOUS SESSION (LIKELY CRASH) - Run persistentLog.show() to view all');
+  const logs = JSON.parse(previousLogs);
+  console.log('Last 5 logs before crash:', logs.slice(-5));
+}
+
+persistentLog.add('✅', 'Session started');
+
 // ==== SIMPLE DEBUG LOGGING ====
 // Monitor critical events for debugging mobile zoom crash
 
 // Track gesture events (pinch/zoom)
 document.addEventListener('gesturestart', (e) => {
-    console.warn('🔍 GESTURE START - scale:', e.scale, 'rotation:', e.rotation);
+    persistentLog.add('🔍', 'GESTURE START', { scale: e.scale, rotation: e.rotation });
 }, { passive: true });
 
 document.addEventListener('gesturechange', (e) => {
-    console.warn('🔍 GESTURE CHANGE - scale:', e.scale);
+    persistentLog.add('🔍', 'GESTURE CHANGE', { scale: e.scale });
 }, { passive: true });
 
 document.addEventListener('gestureend', (e) => {
-    console.warn('🔍 GESTURE END - scale:', e.scale);
+    persistentLog.add('🔍', 'GESTURE END', { scale: e.scale });
 }, { passive: true });
 
 // Monitor memory if available
@@ -31,27 +74,27 @@ if (performance.memory) {
 
 // Detect page about to crash/reload
 window.addEventListener('beforeunload', (e) => {
-    console.error('⚠️ PAGE UNLOADING - Possible crash!');
+    persistentLog.add('⚠️', 'PAGE UNLOADING - Crash or navigation!');
 });
 
 window.addEventListener('pagehide', () => {
-    console.error('⚠️ PAGE HIDDEN - Possible crash!');
+    persistentLog.add('⚠️', 'PAGE HIDDEN - Crash or navigation!');
 });
 
 // Monitor resize events (can indicate zoom issues)
 let resizeCount = 0;
 window.addEventListener('resize', () => {
     resizeCount++;
-    console.log(`📐 Resize #${resizeCount}: ${window.innerWidth}x${window.innerHeight}`);
+    persistentLog.add('📐', `Resize #${resizeCount}`, { width: window.innerWidth, height: window.innerHeight });
 });
 
 // Catch errors
 window.addEventListener('error', (e) => {
-    console.error('❌ ERROR:', e.message, 'at', e.filename, 'line', e.lineno);
+    persistentLog.add('⚠️', 'JavaScript Error', { message: e.message, file: e.filename, line: e.lineno });
 });
 
 window.addEventListener('unhandledrejection', (e) => {
-    console.error('❌ UNHANDLED REJECTION:', e.reason);
+    persistentLog.add('⚠️', 'Unhandled Rejection', { reason: String(e.reason) });
 });
 
 import { createApp, h } from 'vue';
@@ -75,9 +118,9 @@ const app = createApp({
         };
     },
     async mounted() {
-        console.log('✅ Vue app mounted');
-        console.log('📱 Device:', navigator.userAgent);
-        console.log('📐 Viewport:', `${window.innerWidth}x${window.innerHeight}`, 'Pixel ratio:', window.devicePixelRatio);
+        persistentLog.add('✅', 'Vue app mounted');
+        persistentLog.add('📱', 'Device', { ua: navigator.userAgent });
+        persistentLog.add('📐', 'Viewport', { width: window.innerWidth, height: window.innerHeight, pixelRatio: window.devicePixelRatio });
         
         // Detect if we're in an iframe and delay initialization
         const isInIframe = window.self !== window.top;
@@ -109,10 +152,10 @@ const app = createApp({
         
         await this.loadPages();
         
-        console.log('📚 Pages loaded:', this.pages.length);
+        persistentLog.add('📚', 'Pages loaded', { count: this.pages.length });
         if (performance.memory) {
             const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
-            console.log('💾 Initial memory:', usedMB, 'MB');
+            persistentLog.add('💾', 'Initial memory', { MB: usedMB });
         }
         
         // Send initial height to parent window (for iframe embedding)
@@ -232,14 +275,14 @@ const app = createApp({
         onFlipStart() {
             const currentPage = this.$refs.flipbook?.page;
             const totalPages = this.pages.length;
-            console.log(`📖 Flipping to page ${currentPage}/${totalPages}`);
+            persistentLog.add('📖', 'Flipping', { page: currentPage, total: totalPages });
             
             // Warn if on last few pages (where crashes are more common)
             if (currentPage && currentPage >= totalPages - 3) {
-                console.warn(`⚠️ Near end of book - page ${currentPage}/${totalPages}`);
+                persistentLog.add('⚠️', 'Near end of book!', { page: currentPage, total: totalPages });
                 if (performance.memory) {
                     const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
-                    console.warn('💾 Memory at:', usedMB, 'MB');
+                    persistentLog.add('⚠️', 'Memory usage', { MB: usedMB });
                 }
             }
             
