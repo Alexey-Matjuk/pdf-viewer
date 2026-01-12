@@ -2,25 +2,28 @@
  * Global Styles for PDF Flipbook Viewer
  */
 
-/* Critical: Prevent iframe rendering issues during zoom */
+/* Allow zoom but optimize rendering */
+html, body {
+    /* Allow normal touch interactions including zoom */
+    touch-action: manipulation;
+    -ms-touch-action: manipulation;
+}
+
+/* Critical: Optimize iframe and images for memory */
 .flipbook-container {
-    /* Force GPU compositing for smoother zoom */
+    /* Force GPU compositing */
     transform: translate3d(0, 0, 0);
     -webkit-transform: translate3d(0, 0, 0);
 }
 
-/* Optimize images for mobile - reduce quality during zoom */
+/* Optimize images for mobile */
 img {
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
+    image-rendering: auto;
+    -webkit-user-drag: none;
+    user-select: none;
 }
 
-/* Use lower quality rendering on mobile */
 @media (max-width: 768px) {
-    img {
-        image-rendering: auto;
-    }
-    
     /* Limit max image size to reduce memory */
     .flipbook img {
         max-width: 100%;

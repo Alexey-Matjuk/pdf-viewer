@@ -227,10 +227,12 @@ const app = createApp({
         return {
             loading: true,
             pages: [],
+            allPageUrls: [], // Store all page URLs
             error: null,
             isFullscreen: false,
             backgroundColor: '#333',
-            lastHeight: 0
+            lastHeight: 0,
+            currentPage: 0
         };
     },
     async mounted() {
@@ -267,12 +269,6 @@ const app = createApp({
         }
         
         await this.loadPages();
-        
-        persistentLog.add('📚', 'Pages loaded', { count: this.pages.length });
-        if (performance.memory) {
-            const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
-            persistentLog.add('💾', 'Initial memory', { MB: usedMB });
-        }
         
         // Send initial height to parent window (for iframe embedding)
         this.$nextTick(() => {
@@ -372,34 +368,91 @@ const app = createApp({
                 console.log('Raw loaded pages:', loadedPages);
                 console.log('Pages length:', loadedPages.length);
                 
-                // Convert to plain array and ensure it's not empty
-                this.pages = [...loadedPages];
-                console.log('Pages loaded:', this.pages);
-                console.log('this.pages.length:', this.pages.length);
-                
-                if (this.pages.length === 0) {
+                if (loadedPages.length === 0) {
                     throw new Error('No pages found in assets directory');
                 }
                 
+                // Store all page URLs
+                this.allPageUrls = [...loadedPages];
+                
+                // Create placeholder (1x1 transparent pixel)
+                const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                
+                // Initialize pages array with placeholders
+                this.pages = new Array(loadedPages.length).fill(placeholder);
+                
+                // Load first 3 pages immediately
+                this.loadPageRange(0, 2);
+                
                 this.loading = false;
+                
+                persistentLog.add('📚', 'Pages loaded', { count: this.allPageUrls.length });
+                if (performance.memory) {
+                    const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
+                    persistentLog.add('💾', 'Initial memory', { MB: usedMB });
+                }
             } catch (error) {
                 console.error('Error loading pages:', error);
                 this.error = error.message;
                 this.loading = false;
             }
         },
+        
+        loadPageRange(start, end) {
+            // Load pages from start to end index
+            for (let i = start; i <= end && i < this.allPageUrls.length; i++) {
+                if (this.pages[i] && this.pages[i].startsWith('data:image/gif')) {
+                    // Replace placeholder with actual page
+                    this.pages[i] = this.allPageUrls[i];
+                    persistentLog.add('📄', `Loaded page ${i + 1}`);
+                }
+            }
+        },
+        
+        unloadPageRange(start, end) {
+            // Unload pages by replacing with placeholder
+            const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+            for (let i = start; i <= end && i < this.allPageUrls.length; i++) {
+                if (this.pages[i] && !this.pages[i].startsWith('data:image/gif')) {
+                    this.pages[i] = placeholder;
+                    persistentLog.add('🗑️', `Unloaded page ${i + 1}`);
+                }
+            }
+        },
+        
         onFlipStart() {
             const currentPage = this.$refs.flipbook?.page;
-            const totalPages = this.pages.length;
+            const totalPages = this.allPageUrls.length;
+            
+            if (!currentPage) return;
+            
+            this.currentPage = currentPage;
             persistentLog.add('📖', 'Flipping', { page: currentPage, total: totalPages });
             
+            // Load current page + 2 pages ahead, unload pages further back
+            const loadStart = Math.max(0, currentPage - 1);
+            const loadEnd = Math.min(totalPages - 1, currentPage + 2);
+            
+            // Load needed pages
+            this.loadPageRange(loadStart, loadEnd);
+            
+            // Unload pages that are far away (more than 3 pages away)
+            if (currentPage > 4) {
+                this.unloadPageRange(0, currentPage - 4);
+            }
+            if (currentPage < totalPages - 4) {
+                this.unloadPageRange(currentPage + 4, totalPages - 1);
+            }
+            
+            // Log memory
+            if (performance.memory) {
+                const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
+                persistentLog.add('💾', 'Memory', { MB: usedMB, page: currentPage });
+            }
+            
             // Warn if on last few pages (where crashes are more common)
-            if (currentPage && currentPage >= totalPages - 3) {
+            if (currentPage >= totalPages - 3) {
                 persistentLog.add('⚠️', 'Near end of book!', { page: currentPage, total: totalPages });
-                if (performance.memory) {
-                    const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
-                    persistentLog.add('⚠️', 'Memory usage', { MB: usedMB });
-                }
             }
             
             // Auto zoom out when flipping pages
