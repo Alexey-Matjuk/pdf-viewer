@@ -375,14 +375,9 @@ const app = createApp({
                 // Store all page URLs
                 this.allPageUrls = [...loadedPages];
                 
-                // Create placeholder (1x1 transparent pixel)
-                const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-                
-                // Initialize pages array with placeholders
-                this.pages = new Array(loadedPages.length).fill(placeholder);
-                
-                // Load first 6 pages immediately (for spread view)
-                this.loadPageRange(0, 5);
+                // For now, load ALL pages to prevent blank pages issue
+                // Memory optimization can be fine-tuned later
+                this.pages = [...loadedPages];
                 
                 this.loading = false;
                 
@@ -429,26 +424,11 @@ const app = createApp({
             this.currentPage = currentPage;
             persistentLog.add('📖', 'Flipping', { page: currentPage, total: totalPages });
             
-            // Flipbook shows 2 pages at once (spread)
-            // Load current page + 3 pages on each side to be safe
-            const loadStart = Math.max(0, currentPage - 3);
-            const loadEnd = Math.min(totalPages - 1, currentPage + 4);
-            
-            // Load needed pages
-            this.loadPageRange(loadStart, loadEnd);
-            
-            // Unload pages that are far away (more than 6 pages away)
-            if (currentPage > 7) {
-                this.unloadPageRange(0, currentPage - 7);
-            }
-            if (currentPage < totalPages - 7) {
-                this.unloadPageRange(currentPage + 7, totalPages - 1);
-            }
-            
-            // Log memory
+            // Log memory usage
             if (performance.memory) {
                 const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
-                persistentLog.add('💾', 'Memory', { MB: usedMB, page: currentPage });
+                const limitMB = (performance.memory.jsHeapSizeLimit / 1048576).toFixed(2);
+                persistentLog.add('💾', 'Memory', { usedMB, limitMB, page: currentPage });
             }
             
             // Warn if on last few pages (where crashes are more common)
