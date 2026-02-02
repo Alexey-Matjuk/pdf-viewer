@@ -6,14 +6,14 @@
 // Logs survive page reloads/crashes via localStorage AND display on screen
 
 const persistentLog = {
-  overlay: null,
-  logList: null,
-  
-  init() {
-    // Create visual overlay
-    this.overlay = document.createElement('div');
-    this.overlay.id = 'debug-overlay';
-    this.overlay.style.cssText = `
+    overlay: null,
+    logList: null,
+
+    init() {
+        // Create visual overlay
+        this.overlay = document.createElement('div');
+        this.overlay.id = 'debug-overlay';
+        this.overlay.style.cssText = `
       position: fixed;
       top: 0;
       left: 0;
@@ -27,16 +27,67 @@ const persistentLog = {
       z-index: 999999;
       overflow-y: scroll;
       -webkit-overflow-scrolling: touch;
+      display: none; /* Hidden by default */
       pointer-events: auto;
       border-bottom: 3px solid #0f0;
       user-select: text;
       -webkit-user-select: text;
     `;
-    
-    // Add copy button
-    const copyBtn = document.createElement('button');
-    copyBtn.textContent = '📋 COPY ALL';
-    copyBtn.style.cssText = `
+
+        // Create toggle button
+        const toggleBtn = document.createElement('div');
+        toggleBtn.id = 'debug-toggle-btn';
+        toggleBtn.innerHTML = '📊';
+        toggleBtn.style.cssText = `
+      position: fixed;
+      top: 70px;
+      right: 20px;
+      z-index: 1000000;
+      background: rgba(0, 255, 0, 0.2);
+      color: #0f0;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      font-size: 20px;
+      border: 1px solid #0f0;
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+    `;
+        toggleBtn.onclick = () => {
+            const isHidden = this.overlay.style.display === 'none';
+            this.overlay.style.display = isHidden ? 'block' : 'none';
+            toggleBtn.style.background = isHidden ? 'rgba(0, 255, 0, 0.5)' : 'rgba(0, 255, 0, 0.2)';
+        };
+        document.body.appendChild(toggleBtn);
+
+        // Add Clear button
+        const clearBtn = document.createElement('button');
+        clearBtn.textContent = '🗑️ CLEAR';
+        clearBtn.style.cssText = `
+      position: sticky;
+      top: 0;
+      left: 100px;
+      background: #c00;
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      font-weight: bold;
+      font-size: 12px;
+      cursor: pointer;
+      margin-bottom: 8px;
+      margin-left: 8px;
+      z-index: 1;
+    `;
+        clearBtn.onclick = () => this.clear();
+
+        // Add copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.textContent = '📋 COPY ALL';
+        copyBtn.style.cssText = `
       position: sticky;
       top: 0;
       left: 0;
@@ -50,104 +101,114 @@ const persistentLog = {
       margin-bottom: 8px;
       z-index: 1;
     `;
-    copyBtn.onclick = () => {
-      const logs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
-      const text = logs.join('\n');
-      
-      // Copy to clipboard
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(() => {
-          copyBtn.textContent = '✅ COPIED!';
-          setTimeout(() => copyBtn.textContent = '📋 COPY ALL', 2000);
-        });
-      } else {
-        // Fallback for older browsers
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        copyBtn.textContent = '✅ COPIED!';
-        setTimeout(() => copyBtn.textContent = '📋 COPY ALL', 2000);
-      }
-    };
-    this.overlay.appendChild(copyBtn);
-    
-    this.logList = document.createElement('div');
-    this.logList.style.cssText = 'user-select: text; -webkit-user-select: text;';
-    this.overlay.appendChild(this.logList);
-    document.body.appendChild(this.overlay);
-    
-    // Show previous crash logs
-    const previousLogs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
-    if (previousLogs.length > 0) {
-      const crashHeader = document.createElement('div');
-      crashHeader.style.cssText = 'color: #f00; font-weight: bold; margin-bottom: 5px; font-size: 13px; background: rgba(255,0,0,0.2); padding: 5px;';
-      crashHeader.textContent = '🚨 CRASH DETECTED - PREVIOUS SESSION LOGS:';
-      this.logList.appendChild(crashHeader);
-      
-      previousLogs.slice(-15).forEach(log => {
-        const logDiv = document.createElement('div');
-        logDiv.style.cssText = 'color: #ff0; padding: 2px 0; user-select: text; -webkit-user-select: text;';
-        logDiv.textContent = log;
-        this.logList.appendChild(logDiv);
-      });
-      
-      const divider = document.createElement('div');
-      divider.style.cssText = 'border-top: 2px solid #f00; margin: 8px 0;';
-      this.logList.appendChild(divider);
-      
-      const newSessionHeader = document.createElement('div');
-      newSessionHeader.style.cssText = 'color: #0f0; font-weight: bold; margin-bottom: 5px;';
-      newSessionHeader.textContent = '--- NEW SESSION ---';
-      this.logList.appendChild(newSessionHeader);
-    }
-  },
-  
-  add(type, message, data = {}) {
-    const timestamp = new Date().toISOString().split('T')[1].substring(0, 12);
-    const entry = `[${timestamp}] ${type} ${message} ${JSON.stringify(data)}`;
-    
-    try {
-      const logs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
-      logs.push(entry);
-      localStorage.setItem('crashLogs', JSON.stringify(logs.slice(-100))); // Keep last 100
-      console[type === '⚠️' ? 'warn' : 'log'](type, message, data);
-      
-      // Add to visual overlay
-      if (this.logList) {
-        const logDiv = document.createElement('div');
-        logDiv.style.cssText = `color: ${type === '⚠️' ? '#f80' : '#0f0'}; padding: 2px 0; user-select: text; -webkit-user-select: text;`;
-        logDiv.textContent = entry;
-        this.logList.appendChild(logDiv);
-        
-        // Auto-scroll to bottom
-        this.overlay.scrollTop = this.overlay.scrollHeight;
-        
-        // Keep only last 50 visible entries
-        while (this.logList.children.length > 60) {
-          this.logList.removeChild(this.logList.firstChild);
+        copyBtn.onclick = () => {
+            const logs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
+            const text = logs.join('\n');
+
+            // Copy to clipboard
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(() => {
+                    copyBtn.textContent = '✅ COPIED!';
+                    setTimeout(() => copyBtn.textContent = '📋 COPY ALL', 2000);
+                });
+            } else {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                copyBtn.textContent = '✅ COPIED!';
+                setTimeout(() => copyBtn.textContent = '📋 COPY ALL', 2000);
+            }
+        };
+
+        const controls = document.createElement('div');
+        controls.style.cssText = 'position: sticky; top: 0; background: rgba(0,0,0,0.9); padding: 5px 0; display: flex; gap: 8px;';
+        controls.appendChild(copyBtn);
+        controls.appendChild(clearBtn);
+        this.overlay.appendChild(controls);
+
+        this.logList = document.createElement('div');
+        this.logList.style.cssText = 'user-select: text; -webkit-user-select: text;';
+        this.overlay.appendChild(this.logList);
+        document.body.appendChild(this.overlay);
+
+        // Show previous crash logs
+        const previousLogs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
+        if (previousLogs.length > 0) {
+            const crashHeader = document.createElement('div');
+            crashHeader.style.cssText = 'color: #f00; font-weight: bold; margin-bottom: 5px; font-size: 13px; background: rgba(255,0,0,0.2); padding: 5px;';
+            crashHeader.textContent = '🚨 CRASH DETECTED - PREVIOUS SESSION LOGS:';
+            this.logList.appendChild(crashHeader);
+
+            previousLogs.slice(-15).forEach(log => {
+                const logDiv = document.createElement('div');
+                logDiv.style.cssText = 'color: #ff0; padding: 2px 0; user-select: text; -webkit-user-select: text;';
+                logDiv.textContent = log;
+                this.logList.appendChild(logDiv);
+            });
+
+            const divider = document.createElement('div');
+            divider.style.cssText = 'border-top: 2px solid #f00; margin: 8px 0;';
+            this.logList.appendChild(divider);
+
+            const newSessionHeader = document.createElement('div');
+            newSessionHeader.style.cssText = 'color: #0f0; font-weight: bold; margin-bottom: 5px;';
+            newSessionHeader.textContent = '--- NEW SESSION ---';
+            this.logList.appendChild(newSessionHeader);
         }
-      }
-    } catch (e) {
-      console.error('Log storage failed:', e);
+    },
+
+    add(type, message, data = {}) {
+        const timestamp = new Date().toISOString().split('T')[1].substring(0, 12);
+        const entry = `[${timestamp}] ${type} ${message} ${JSON.stringify(data)}`;
+
+        try {
+            const logs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
+            logs.push(entry);
+            localStorage.setItem('crashLogs', JSON.stringify(logs.slice(-100))); // Keep last 100
+            console[type === '⚠️' ? 'warn' : 'log'](type, message, data);
+
+            // Add to visual overlay
+            if (this.logList) {
+                const logDiv = document.createElement('div');
+                logDiv.style.cssText = `color: ${type === '⚠️' ? '#f80' : '#0f0'}; padding: 2px 0; user-select: text; -webkit-user-select: text;`;
+                logDiv.textContent = entry;
+                this.logList.appendChild(logDiv);
+
+                // Auto-scroll to bottom
+                this.overlay.scrollTop = this.overlay.scrollHeight;
+
+                // Keep only last 50 visible entries
+                while (this.logList.children.length > 60) {
+                    this.logList.removeChild(this.logList.firstChild);
+                }
+            }
+        } catch (e) {
+            console.error('Log storage failed:', e);
+        }
+    },
+
+    show() {
+        const logs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
+        console.log('📋 FULL CRASH HISTORY:\n' + logs.join('\n'));
+        return logs;
+    },
+
+    clear() {
+        localStorage.removeItem('crashLogs');
+        if (this.logList) {
+            // Keep only headers if present
+            while (this.logList.firstChild) {
+                this.logList.removeChild(this.logList.firstChild);
+            }
+        }
+        console.log('🗑️ Logs cleared');
     }
-  },
-  
-  show() {
-    const logs = JSON.parse(localStorage.getItem('crashLogs') || '[]');
-    console.log('📋 FULL CRASH HISTORY:\n' + logs.join('\n'));
-    return logs;
-  },
-  
-  clear() {
-    localStorage.removeItem('crashLogs');
-    if (this.logList) this.logList.innerHTML = '';
-    console.log('🗑️ Logs cleared');
-  }
 };
 
 // Initialize overlay immediately
@@ -239,21 +300,21 @@ const app = createApp({
         persistentLog.add('✅', 'Vue app mounted');
         persistentLog.add('📱', 'Device', { ua: navigator.userAgent });
         persistentLog.add('📐', 'Viewport', { width: window.innerWidth, height: window.innerHeight, pixelRatio: window.devicePixelRatio });
-        
+
         // Detect if we're in an iframe and delay initialization
         const isInIframe = window.self !== window.top;
         const initDelay = isInIframe ? 300 : 0;
-        
+
         // Get background color from URL parameter
         const urlParams = new URLSearchParams(window.location.search);
         const bgColor = urlParams.get('bgColor');
         if (bgColor) {
             // Handle color keywords (transparent, etc.) and hex colors
-            this.backgroundColor = bgColor.startsWith('#') || /^[a-z]+$/i.test(bgColor) 
-                ? bgColor 
+            this.backgroundColor = bgColor.startsWith('#') || /^[a-z]+$/i.test(bgColor)
+                ? bgColor
                 : `#${bgColor}`;
         }
-        
+
         // Apply background color to body and app container
         document.body.style.backgroundColor = this.backgroundColor;
         this.$nextTick(() => {
@@ -261,24 +322,24 @@ const app = createApp({
                 this.$el.style.backgroundColor = this.backgroundColor;
             }
         });
-        
+
         // Delay loading if in iframe to prevent SSR conflicts
         if (initDelay > 0) {
             console.log('Detected iframe embedding, delaying initialization by', initDelay, 'ms');
             await new Promise(resolve => setTimeout(resolve, initDelay));
         }
-        
+
         await this.loadPages();
-        
+
         // Send initial height to parent window (for iframe embedding)
         this.$nextTick(() => {
             this.sendHeightToParent();
         });
-        
+
         // Listen for fullscreen changes
         document.addEventListener('fullscreenchange', this.onFullscreenChange);
         document.addEventListener('webkitfullscreenchange', this.onFullscreenChange);
-        
+
         // Listen for messages from parent (for iframe fullscreen state)
         window.addEventListener('message', this.handleParentMessage);
     },
@@ -292,11 +353,11 @@ const app = createApp({
             if (!this.isFullscreen) {
                 // Try native fullscreen first
                 const elem = document.documentElement;
-                let requestFs = elem.requestFullscreen || 
-                              elem.webkitRequestFullscreen || 
-                              elem.mozRequestFullScreen || 
-                              elem.msRequestFullscreen;
-                
+                let requestFs = elem.requestFullscreen ||
+                    elem.webkitRequestFullscreen ||
+                    elem.mozRequestFullScreen ||
+                    elem.msRequestFullscreen;
+
                 if (requestFs) {
                     requestFs.call(elem).catch(() => {
                         // If native fails (e.g. no allowfullscreen), try fake fullscreen
@@ -325,7 +386,7 @@ const app = createApp({
         toggleFakeFullscreen() {
             // Request parent to toggle fake fullscreen class
             if (window.parent !== window) {
-                window.parent.postMessage({ 
+                window.parent.postMessage({
                     type: 'toggle-fake-fullscreen'
                 }, '*');
                 // Optimistically update state
@@ -339,10 +400,10 @@ const app = createApp({
             }
         },
         onFullscreenChange() {
-            this.isFullscreen = !!(document.fullscreenElement || 
-                                  document.webkitFullscreenElement || 
-                                  document.mozFullScreenElement || 
-                                  document.msFullscreenElement);
+            this.isFullscreen = !!(document.fullscreenElement ||
+                document.webkitFullscreenElement ||
+                document.mozFullScreenElement ||
+                document.msFullscreenElement);
         },
         sendHeightToParent() {
             if (window.parent !== window) {
@@ -353,9 +414,9 @@ const app = createApp({
                     // Only send if height actually changed
                     if (height !== this.lastHeight) {
                         this.lastHeight = height;
-                        window.parent.postMessage({ 
-                            type: 'flipbook-height', 
-                            height: height 
+                        window.parent.postMessage({
+                            type: 'flipbook-height',
+                            height: height
                         }, '*');
                     }
                 }
@@ -363,25 +424,30 @@ const app = createApp({
         },
         async loadPages() {
             try {
-                console.log('Starting to load pages...');
+                persistentLog.add('🔄', 'Starting to load pages (Lazy Loading enabled)...');
                 const loadedPages = await loadPageUrls();
-                console.log('Raw loaded pages:', loadedPages);
-                console.log('Pages length:', loadedPages.length);
-                
+
                 if (loadedPages.length === 0) {
                     throw new Error('No pages found in assets directory');
                 }
-                
-                // Store all page URLs
+
+                // Store all page URLs for future loading
                 this.allPageUrls = [...loadedPages];
-                
-                // For now, load ALL pages to prevent blank pages issue
-                // Memory optimization can be fine-tuned later
-                this.pages = [...loadedPages];
-                
+
+                // Create a placeholder-filled array of the correct length
+                const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                this.pages = new Array(this.allPageUrls.length).fill(placeholder);
+
+                // Initially load first 3 pages (single page mode or spread)
+                this.loadPageRange(0, 2);
+
                 this.loading = false;
-                
-                persistentLog.add('📚', 'Pages loaded', { count: this.allPageUrls.length });
+
+                persistentLog.add('📚', 'Initialization complete', {
+                    total: this.allPageUrls.length,
+                    loaded: this.pages.filter(p => !p.startsWith('data:')).length
+                });
+
                 if (performance.memory) {
                     const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
                     persistentLog.add('💾', 'Initial memory', { MB: usedMB });
@@ -392,51 +458,72 @@ const app = createApp({
                 this.loading = false;
             }
         },
-        
+
         loadPageRange(start, end) {
-            // Load pages from start to end index
-            for (let i = start; i <= end && i < this.allPageUrls.length; i++) {
+            // Load pages from start to end index (inclusive)
+            let loadedCount = 0;
+            for (let i = Math.max(0, start); i <= end && i < this.allPageUrls.length; i++) {
                 if (this.pages[i] && this.pages[i].startsWith('data:image/gif')) {
-                    // Replace placeholder with actual page (Vue 3 has automatic reactivity)
                     this.pages[i] = this.allPageUrls[i];
-                    persistentLog.add('📄', `Loaded page ${i + 1}`);
+                    loadedCount++;
                 }
             }
+            if (loadedCount > 0) {
+                persistentLog.add('📄', `Lazy loaded ${loadedCount} new pages`);
+            }
         },
-        
-        unloadPageRange(start, end) {
-            // Unload pages by replacing with placeholder
+
+        unloadPageRange(exceptStart, exceptEnd) {
+            // Unload pages EXCEPT those in the range [exceptStart, exceptEnd]
             const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-            for (let i = start; i <= end && i < this.allPageUrls.length; i++) {
-                if (this.pages[i] && !this.pages[i].startsWith('data:image/gif')) {
+            let unloadedCount = 0;
+
+            for (let i = 0; i < this.pages.length; i++) {
+                // If index is outside the protected range and is currently loaded
+                if ((i < exceptStart || i > exceptEnd) && !this.pages[i].startsWith('data:image/gif')) {
                     this.pages[i] = placeholder;
-                    persistentLog.add('🗑️', `Unloaded page ${i + 1}`);
+                    unloadedCount++;
                 }
             }
+
+            if (unloadedCount > 0) {
+                persistentLog.add('🗑️', `Evicted ${unloadedCount} pages from memory`);
+            }
         },
-        
+
         onFlipStart() {
-            const currentPage = this.$refs.flipbook?.page;
+            const currentPage = this.$refs.flipbook?.page || 1;
             const totalPages = this.allPageUrls.length;
-            
-            if (!currentPage) return;
-            
+
             this.currentPage = currentPage;
-            persistentLog.add('📖', 'Flipping', { page: currentPage, total: totalPages });
-            
+
+            // Logic for lazy loading window (Current +/- 2 pages)
+            // On mobile we want to be more aggressive (smaller window)
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            const windowSize = isMobile ? 2 : 4;
+
+            const startIdx = Math.max(0, (currentPage - 1) - windowSize);
+            const endIdx = Math.min(totalPages - 1, (currentPage - 1) + windowSize);
+
+            // 1. Load the new window
+            this.loadPageRange(startIdx, endIdx);
+
+            // 2. Unload everything outside the window to free memory
+            this.unloadPageRange(startIdx, endIdx);
+
+            persistentLog.add('📖', 'Flipping', {
+                page: currentPage,
+                window: `${startIdx + 1}-${endIdx + 1}`,
+                totalLoaded: this.pages.filter(p => !p.startsWith('data:')).length
+            });
+
             // Log memory usage
             if (performance.memory) {
                 const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
-                const limitMB = (performance.memory.jsHeapSizeLimit / 1048576).toFixed(2);
-                persistentLog.add('💾', 'Memory', { usedMB, limitMB, page: currentPage });
+                persistentLog.add('💾', 'Memory', { usedMB, page: currentPage });
             }
-            
-            // Warn if on last few pages (where crashes are more common)
-            if (currentPage >= totalPages - 3) {
-                persistentLog.add('⚠️', 'Near end of book!', { page: currentPage, total: totalPages });
-            }
-            
-            // Auto zoom out when flipping pages
+
+            // Auto zoom out when flipping pages to avoid zoom-related rendering glitches
             if (this.$refs.flipbook && this.$refs.flipbook.canZoomOut) {
                 this.$refs.flipbook.zoomOut();
             }
@@ -444,11 +531,11 @@ const app = createApp({
     },
     render() {
         console.log('Render called - loading:', this.loading, 'error:', this.error, 'pages.length:', this.pages.length);
-        
+
         if (this.loading) {
             return h('div', { class: 'loading' }, 'Loading pages...');
         }
-        
+
         if (this.error) {
             return h('div', {
                 style: {
@@ -466,27 +553,21 @@ const app = createApp({
                 h('p', this.error)
             ]);
         }
-        
+
         if (this.pages.length > 0) {
             console.log('Rendering flipbook with pages:', this.pages.length);
-            
+
             // Detect mobile device
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            
+
             return h('div', { style: { backgroundColor: this.backgroundColor, width: '100%', height: '100%', position: 'relative' } }, [
                 h(Flipbook, {
                     class: 'flipbook',
                     pages: this.pages,
-                    zooms: [1, 2],
+                    zooms: [1, 2, 3],
                     ambient: 1,
                     clickToZoom: false,
                     ref: 'flipbook',
-                    // Mobile optimization: reduce preload and rendering quality
-                    ...(isMobile ? {
-                        nPolygons: 3,  // Reduce 3D complexity
-                        perspective: 1000,  // Reduce perspective depth
-                        gloss: 0  // Disable glossy effects
-                    } : {}),
                     onFlipLeftStart: this.onFlipStart,
                     onFlipRightStart: this.onFlipStart
                 }, {
@@ -507,7 +588,7 @@ const app = createApp({
                                 }),
 
                                 // Page Counter
-                                h('div', { class: 'page-counter' }, 
+                                h('div', { class: 'page-counter' },
                                     `${slotProps.page} / ${slotProps.numPages}`
                                 ),
 
@@ -567,7 +648,7 @@ const app = createApp({
                                         this.toggleFullscreen();
                                     },
                                     title: this.isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen',
-                                    innerHTML: this.isFullscreen 
+                                    innerHTML: this.isFullscreen
                                         ? '<svg viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>'
                                         : '<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>'
                                 })
@@ -577,7 +658,7 @@ const app = createApp({
                 })
             ]);
         }
-        
+
         console.log('Rendering null - no conditions met');
         return h('div', { class: 'loading' }, 'Waiting for pages...');
     }
