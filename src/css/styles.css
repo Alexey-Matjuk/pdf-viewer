@@ -2,21 +2,10 @@
  * Global Styles for PDF Flipbook Viewer
  */
 
-/* Allow zoom but optimize rendering */
-html, body {
-    /* Allow normal touch interactions including zoom */
-    touch-action: manipulation;
-    -ms-touch-action: manipulation;
-}
-
-/* Critical: Optimize iframe and images for memory */
-.flipbook-container {
-    /* Force GPU compositing but avoid over-allocation */
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-}
+/* Critical: DO NOT override .flipbook-container transforms!
+   The library uses transform: scale() + left/top positioning for zoom-to-point.
+   Any transform here will break the zoom centering logic.
+*/
 
 /* Optimize images for mobile */
 img {
@@ -28,14 +17,16 @@ img {
 }
 
 @media (max-width: 768px) {
+
     /* Limit max image size to reduce memory */
     .flipbook img {
         max-width: 100%;
         height: auto;
     }
-    
+
     /* Disable expensive filters on mobile */
-    .zoom-controls, .fullscreen-btn {
+    .zoom-controls,
+    .fullscreen-btn {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
         background: rgba(30, 30, 30, 0.95) !important;
@@ -45,28 +36,30 @@ img {
 iframe {
     /* Simplified rendering hints */
     transform: translateZ(0);
-    -webkit-transform: translateZ(0);
 }
 
+/* Base Reset */
 * {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-touch-action: manipulation;
-    touch-action: manipulation;
-    margin: 0;
-    padding: 0;
     box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
     margin: 0;
     padding: 0;
     height: 100%;
     width: 100%;
-    /* Ensure no weird scrolling during zoom */
+}
+
+html {
     overflow: hidden;
 }
+
+.flipbook-container {
+    touch-action: none;
+}
+
+
 
 body {
     background-color: #121212;
@@ -80,7 +73,7 @@ body {
     justify-content: center;
     align-items: center;
     padding: 20px;
-    overflow: hidden; /* Prevent layout shifts */
+    /* Prevent layout shifts */
 }
 
 .flipbook {
@@ -88,25 +81,7 @@ body {
     height: calc(100vh - 100px) !important;
 }
 
-.page {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-    position: relative;
-    /* Help Safari with rendering */
-    transform: translateZ(0);
 
-    img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        object-position: center;
-        display: block;
-        /* Hardware acceleration for images */
-        will-change: transform;
-    }
-}
 
 .loading {
     position: absolute;
@@ -240,4 +215,36 @@ body {
     height: 24px;
     background: rgba(255, 255, 255, 0.15);
     margin: 0 4px;
+}
+
+
+
+/* Loading Spinner */
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: white;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    z-index: 1000;
 }

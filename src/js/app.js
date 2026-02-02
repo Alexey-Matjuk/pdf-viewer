@@ -293,11 +293,21 @@ const app = createApp({
             isFullscreen: false,
             backgroundColor: '#333',
             lastHeight: 0,
-            currentPage: 1
+            lastHeight: 0,
+            isInitialized: false,
+            currentPage: (() => {
+                const hashPage = parseInt(window.location.hash.replace('#', ''));
+                return (!isNaN(hashPage) && hashPage > 0) ? hashPage : 1;
+            })()
         };
     },
     async mounted() {
         persistentLog.add('✅', 'Vue app mounted');
+
+        // Set initialized after short delay to allow startPage to take effect
+        setTimeout(() => {
+            this.isInitialized = true;
+        }, 500);
         persistentLog.add('📱', 'Device', { ua: navigator.userAgent });
         persistentLog.add('📐', 'Viewport', { width: window.innerWidth, height: window.innerHeight, pixelRatio: window.devicePixelRatio });
 
@@ -342,8 +352,16 @@ const app = createApp({
 
         // Listen for messages from parent (for iframe fullscreen state)
         window.addEventListener('message', this.handleParentMessage);
+
+        // Listen for hash changes (browser back/forward)
+        window.addEventListener('hashchange', this.onHashChange);
+
+        // Listen for keyboard navigation
+        window.addEventListener('keydown', this.onKeyDown);
     },
     beforeUnmount() {
+        window.removeEventListener('keydown', this.onKeyDown);
+        window.removeEventListener('hashchange', this.onHashChange);
         document.removeEventListener('fullscreenchange', this.onFullscreenChange);
         document.removeEventListener('webkitfullscreenchange', this.onFullscreenChange);
         window.removeEventListener('message', this.handleParentMessage);
@@ -422,6 +440,42 @@ const app = createApp({
                 }
             }
         },
+        onHashChange() {
+            const hashPage = parseInt(window.location.hash.replace('#', ''));
+            if (!isNaN(hashPage) && hashPage > 0 && hashPage !== this.currentPage) {
+                this.currentPage = hashPage;
+                // Trigger loading logic for the new page
+                this.onFlipStart(hashPage);
+            }
+        },
+        onKeyDown(e) {
+            // Ignore if input/textarea is focused
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+            if (e.key === 'ArrowLeft') {
+                const flipbook = this.$refs.flipbook;
+                if (flipbook && typeof flipbook.flipLeft === 'function') {
+                    flipbook.flipLeft();
+                } else if (flipbook && typeof flipbook.goToPage === 'function') {
+                    flipbook.goToPage(this.currentPage - 1);
+                } else {
+                    // Fallback: Click the button if methods aren't exposed
+                    const btn = document.querySelector('button[title="Previous Page"]');
+                    if (btn && !btn.disabled) btn.click();
+                }
+            } else if (e.key === 'ArrowRight') {
+                const flipbook = this.$refs.flipbook;
+                if (flipbook && typeof flipbook.flipRight === 'function') {
+                    flipbook.flipRight();
+                } else if (flipbook && typeof flipbook.goToPage === 'function') {
+                    flipbook.goToPage(this.currentPage + 1);
+                } else {
+                    // Fallback: Click the button if methods aren't exposed
+                    const btn = document.querySelector('button[title="Next Page"]');
+                    if (btn && !btn.disabled) btn.click();
+                }
+            }
+        },
         async loadPages() {
             try {
                 persistentLog.add('🔄', 'Starting to load pages (Lazy Loading enabled)...');
@@ -438,8 +492,12 @@ const app = createApp({
                 const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
                 this.pages = new Array(this.allPageUrls.length).fill(placeholder);
 
-                // Initially load first 3 pages (single page mode or spread)
-                this.loadPageRange(0, 2);
+                // Initially load pages around the current page (initial or hash-based)
+                // Use a slightly larger window for initial load to ensure visibility
+                const startPage = Math.max(0, this.currentPage - 2);
+                const endPage = Math.min(this.allPageUrls.length - 1, this.currentPage + 1);
+
+                this.loadPageRange(startPage, endPage);
 
                 this.loading = false;
 
@@ -506,7 +564,10 @@ const app = createApp({
             // Update state
             this.currentPage = currentPage;
 
-            // Logic for lazy loading window
+            // Update URL hash without scrolling
+            if (window.location.hash !== `#${currentPage}`) {
+                history.replaceState(null, null, `#${currentPage}`);
+            } // Logic for lazy loading window
             // INCREASED WINDOW SIZE: 
             // Mobile: +/- 6 pages (total ~13)
             // Desktop: +/- 10 pages (total ~21)
@@ -538,13 +599,21 @@ const app = createApp({
             if (this.$refs.flipbook && this.$refs.flipbook.canZoomOut) {
                 this.$refs.flipbook.zoomOut();
             }
+
+            // Sync Flipbook component state (required for deep linking/hash changes)
+            if (this.$refs.flipbook && typeof this.$refs.flipbook.goToPage === 'function') {
+                this.$refs.flipbook.goToPage(currentPage);
+            }
         }
     },
     render() {
         console.log('Render called - loading:', this.loading, 'error:', this.error, 'pages.length:', this.pages.length);
 
         if (this.loading) {
-            return h('div', { class: 'loading' }, 'Loading pages...');
+            return h('div', { class: 'loading-container' }, [
+                h('div', { class: 'loading-spinner' }),
+                h('div', 'Loading pages...')
+            ]);
         }
 
         if (this.error) {
@@ -575,18 +644,20 @@ const app = createApp({
                 h(Flipbook, {
                     class: 'flipbook',
                     pages: this.pages,
-                    page: this.currentPage,
-                    zooms: [1, 2, 3],
+
                     ambient: 1,
-                    clickToZoom: false,
+                    clickToZoom: true,
+                    startPage: this.currentPage,
                     ref: 'flipbook',
                     onFlipLeftStart: (page) => {
                         persistentLog.add('◀️', 'Flip Left Start', { from: page });
-                        this.onFlipStart(Math.max(1, page - 1));
+                        // Don't manually update state here; let slotProps/end-event handle it
+                        // this.onFlipStart(Math.max(1, page - 1));
                     },
                     onFlipRightStart: (page) => {
                         persistentLog.add('▶️', 'Flip Right Start', { from: page });
-                        this.onFlipStart(Math.min(this.allPageUrls.length, page + 1));
+                        // Don't manually update state here; let slotProps/end-event handle it
+                        // this.onFlipStart(Math.min(this.allPageUrls.length, page + 1));
                     },
                     // End events to ensure final state is caught
                     onFlipLeftEnd: (page) => {
@@ -600,12 +671,24 @@ const app = createApp({
                 }, {
                     default: (slotProps) => {
                         // CRITICAL: Synchronize internal state with slot property
-                        // This is the most reliable way to track navigation in flipbook-vue
-                        if (slotProps.page && slotProps.page !== this.currentPage) {
+                        // Use isInitialized guard to prevent overwriting initial startPage
+                        if (this.isInitialized && slotProps.page && slotProps.page !== this.currentPage) {
                             this.currentPage = slotProps.page;
                             // Update window for the new page
                             // Use a slight delay to avoid conflicts during flip
                             setTimeout(() => this.onFlipStart(slotProps.page), 0);
+                        }
+
+                        // DEBUG: Monitor scroll dimensions during interactions
+                        if (this.isInitialized && slotProps.canZoomOut) {
+                            const viewport = this.$refs.flipbook?.$refs?.viewport;
+                            if (viewport && Math.random() < 0.05) { // Throttle
+                                console.log('🔍 Zoom Scroll:', {
+                                    scrollLeft: viewport.scrollLeft,
+                                    scrollWidth: viewport.scrollWidth,
+                                    clientWidth: viewport.clientWidth
+                                });
+                            }
                         }
 
                         return [
