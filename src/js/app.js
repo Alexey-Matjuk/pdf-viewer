@@ -293,7 +293,7 @@ const app = createApp({
             isFullscreen: false,
             backgroundColor: '#333',
             lastHeight: 0,
-            currentPage: 0
+            currentPage: 1
         };
     },
     async mounted() {
@@ -462,13 +462,18 @@ const app = createApp({
         loadPageRange(start, end) {
             // Load pages from start to end index (inclusive)
             let loadedCount = 0;
+            let changed = false;
+
             for (let i = Math.max(0, start); i <= end && i < this.allPageUrls.length; i++) {
                 if (this.pages[i] && this.pages[i].startsWith('data:image/gif')) {
-                    this.pages[i] = this.allPageUrls[i];
+                    // Use splice for reactive in-place update in Vue
+                    this.pages.splice(i, 1, this.allPageUrls[i]);
                     loadedCount++;
+                    changed = true;
                 }
             }
-            if (loadedCount > 0) {
+
+            if (changed) {
                 persistentLog.add('📄', `Lazy loaded ${loadedCount} new pages`);
             }
         },
@@ -477,30 +482,36 @@ const app = createApp({
             // Unload pages EXCEPT those in the range [exceptStart, exceptEnd]
             const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
             let unloadedCount = 0;
+            let changed = false;
 
             for (let i = 0; i < this.pages.length; i++) {
                 // If index is outside the protected range and is currently loaded
                 if ((i < exceptStart || i > exceptEnd) && !this.pages[i].startsWith('data:image/gif')) {
-                    this.pages[i] = placeholder;
+                    this.pages.splice(i, 1, placeholder);
                     unloadedCount++;
+                    changed = true;
                 }
             }
 
-            if (unloadedCount > 0) {
+            if (changed) {
                 persistentLog.add('🗑️', `Evicted ${unloadedCount} pages from memory`);
             }
         },
 
-        onFlipStart() {
-            const currentPage = this.$refs.flipbook?.page || 1;
+        onFlipStart(targetPage) {
+            // targetPage is the page we want to load for (either current or next)
+            const currentPage = targetPage || this.$refs.flipbook?.page || this.currentPage || 1;
             const totalPages = this.allPageUrls.length;
 
+            // Update state
             this.currentPage = currentPage;
 
-            // Logic for lazy loading window (Current +/- 2 pages)
-            // On mobile we want to be more aggressive (smaller window)
+            // Logic for lazy loading window
+            // INCREASED WINDOW SIZE: 
+            // Mobile: +/- 6 pages (total ~13)
+            // Desktop: +/- 10 pages (total ~21)
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            const windowSize = isMobile ? 2 : 4;
+            const windowSize = isMobile ? 6 : 10;
 
             const startIdx = Math.max(0, (currentPage - 1) - windowSize);
             const endIdx = Math.min(totalPages - 1, (currentPage - 1) + windowSize);
@@ -564,14 +575,39 @@ const app = createApp({
                 h(Flipbook, {
                     class: 'flipbook',
                     pages: this.pages,
+                    page: this.currentPage,
                     zooms: [1, 2, 3],
                     ambient: 1,
                     clickToZoom: false,
                     ref: 'flipbook',
-                    onFlipLeftStart: this.onFlipStart,
-                    onFlipRightStart: this.onFlipStart
+                    onFlipLeftStart: (page) => {
+                        persistentLog.add('◀️', 'Flip Left Start', { from: page });
+                        this.onFlipStart(Math.max(1, page - 1));
+                    },
+                    onFlipRightStart: (page) => {
+                        persistentLog.add('▶️', 'Flip Right Start', { from: page });
+                        this.onFlipStart(Math.min(this.allPageUrls.length, page + 1));
+                    },
+                    // End events to ensure final state is caught
+                    onFlipLeftEnd: (page) => {
+                        persistentLog.add('◀️', 'Flip Left End', { to: page });
+                        this.onFlipStart(page);
+                    },
+                    onFlipRightEnd: (page) => {
+                        persistentLog.add('▶️', 'Flip Right End', { to: page });
+                        this.onFlipStart(page);
+                    }
                 }, {
                     default: (slotProps) => {
+                        // CRITICAL: Synchronize internal state with slot property
+                        // This is the most reliable way to track navigation in flipbook-vue
+                        if (slotProps.page && slotProps.page !== this.currentPage) {
+                            this.currentPage = slotProps.page;
+                            // Update window for the new page
+                            // Use a slight delay to avoid conflicts during flip
+                            setTimeout(() => this.onFlipStart(slotProps.page), 0);
+                        }
+
                         return [
                             // Bottom Controls Container
                             h('div', { class: 'zoom-controls' }, [
