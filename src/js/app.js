@@ -34,7 +34,15 @@ const persistentLog = {
       -webkit-user-select: text;
     `;
 
-        // Create toggle button
+        // Create toggle button only if debug=true is in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const isDebugMode = urlParams.get('debug') === 'true';
+
+        if (!isDebugMode) {
+            console.log('📊 Debug mode disabled. Add ?debug=true to URL to enable overlay.');
+            return;
+        }
+
         const toggleBtn = document.createElement('div');
         toggleBtn.id = 'debug-toggle-btn';
         toggleBtn.innerHTML = '📊';
@@ -184,7 +192,7 @@ const persistentLog = {
                 this.overlay.scrollTop = this.overlay.scrollHeight;
 
                 // Keep only last 50 visible entries
-                while (this.logList.children.length > 60) {
+                while (this.logList.children.length > 200) {
                     this.logList.removeChild(this.logList.firstChild);
                 }
             }
@@ -217,7 +225,7 @@ persistentLog.init();
 // Expose globally for manual inspection
 window.persistentLog = persistentLog;
 
-persistentLog.add('✅', 'Session started', { time: new Date().toISOString() });
+persistentLog.add('✅', 'Session started');
 
 // ==== SIMPLE DEBUG LOGGING ====
 // Monitor critical events for debugging mobile zoom crash
@@ -358,6 +366,18 @@ const app = createApp({
 
         // Listen for keyboard navigation
         window.addEventListener('keydown', this.onKeyDown);
+
+        // Register Service Worker for caching
+        if ('serviceWorker' in navigator) {
+            try {
+                const registration = await navigator.serviceWorker.register('/sw.js', {
+                    scope: '/'
+                });
+                persistentLog.add('👷', 'Service Worker registered', { scope: registration.scope });
+            } catch (error) {
+                persistentLog.add('⚠️', 'Service Worker registration failed', { error: error.message });
+            }
+        }
     },
     beforeUnmount() {
         window.removeEventListener('keydown', this.onKeyDown);
@@ -445,7 +465,7 @@ const app = createApp({
             if (!isNaN(hashPage) && hashPage > 0 && hashPage !== this.currentPage) {
                 this.currentPage = hashPage;
                 // Trigger loading logic for the new page
-                this.onFlipStart(hashPage);
+                // this.updatePagesAround(hashPage);
             }
         },
         onKeyDown(e) {
@@ -488,22 +508,18 @@ const app = createApp({
                 // Store all page URLs for future loading
                 this.allPageUrls = [...loadedPages];
 
-                // Create a placeholder-filled array of the correct length
-                const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-                this.pages = new Array(this.allPageUrls.length).fill(placeholder);
+                // Create a null-filled array of the correct length (lazy loading)
+                this.pages = new Array(this.allPageUrls.length).fill(null);
+                persistentLog.add('🔄', '*** Loaded pages', this.pages.length);
 
-                // Initially load pages around the current page (initial or hash-based)
-                // Use a slightly larger window for initial load to ensure visibility
-                const startPage = Math.max(0, this.currentPage - 2);
-                const endPage = Math.min(this.allPageUrls.length - 1, this.currentPage + 1);
-
-                this.loadPageRange(startPage, endPage);
+                // Initial Load using the new Smart Strategy
+                this.updatePagesAround(this.currentPage);
 
                 this.loading = false;
 
                 persistentLog.add('📚', 'Initialization complete', {
                     total: this.allPageUrls.length,
-                    loaded: this.pages.filter(p => !p.startsWith('data:')).length
+                    loaded: this.pages.filter(p => p && !p.startsWith('data:')).length
                 });
 
                 if (performance.memory) {
@@ -517,49 +533,15 @@ const app = createApp({
             }
         },
 
-        loadPageRange(start, end) {
-            // Load pages from start to end index (inclusive)
-            let loadedCount = 0;
-            let changed = false;
-
-            for (let i = Math.max(0, start); i <= end && i < this.allPageUrls.length; i++) {
-                if (this.pages[i] && this.pages[i].startsWith('data:image/gif')) {
-                    // Use splice for reactive in-place update in Vue
-                    this.pages.splice(i, 1, this.allPageUrls[i]);
-                    loadedCount++;
-                    changed = true;
-                }
-            }
-
-            if (changed) {
-                persistentLog.add('📄', `Lazy loaded ${loadedCount} new pages`);
-            }
+        getVisibleIndices(page) {
+            const leftIndex = page - 1;
+            const rightIndex = leftIndex + 1;
+            return [leftIndex, rightIndex].filter(i => i >= 0 && i < this.allPageUrls.length);
         },
 
-        unloadPageRange(exceptStart, exceptEnd) {
-            // Unload pages EXCEPT those in the range [exceptStart, exceptEnd]
-            const placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-            let unloadedCount = 0;
-            let changed = false;
-
-            for (let i = 0; i < this.pages.length; i++) {
-                // If index is outside the protected range and is currently loaded
-                if ((i < exceptStart || i > exceptEnd) && !this.pages[i].startsWith('data:image/gif')) {
-                    this.pages.splice(i, 1, placeholder);
-                    unloadedCount++;
-                    changed = true;
-                }
-            }
-
-            if (changed) {
-                persistentLog.add('🗑️', `Evicted ${unloadedCount} pages from memory`);
-            }
-        },
-
-        onFlipStart(targetPage) {
+        updatePagesAround(targetPage) {
             // targetPage is the page we want to load for (either current or next)
             const currentPage = targetPage || this.$refs.flipbook?.page || this.currentPage || 1;
-            const totalPages = this.allPageUrls.length;
 
             // Update state
             this.currentPage = currentPage;
@@ -567,26 +549,32 @@ const app = createApp({
             // Update URL hash without scrolling
             if (window.location.hash !== `#${currentPage}`) {
                 history.replaceState(null, null, `#${currentPage}`);
-            } // Logic for lazy loading window
-            // INCREASED WINDOW SIZE: 
-            // Mobile: +/- 6 pages (total ~13)
-            // Desktop: +/- 10 pages (total ~21)
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            const windowSize = isMobile ? 6 : 10;
+            }
 
-            const startIdx = Math.max(0, (currentPage - 1) - windowSize);
-            const endIdx = Math.min(totalPages - 1, (currentPage - 1) + windowSize);
+            // 1. IMMEDIATE: Load ONLY visible pages
+            const visibleIndices = this.getVisibleIndices(currentPage);
+            let loadedCount = 0;
+            visibleIndices.forEach(i => {
+                if (!this.pages[i]) {
+                    this.pages.splice(i, 1, this.allPageUrls[i]);
+                    loadedCount++;
+                }
+            });
 
-            // 1. Load the new window
-            this.loadPageRange(startIdx, endIdx);
+            if (loadedCount > 0) {
+                persistentLog.add('⚡️', `Immediate load: ${loadedCount} pages`, { indices: visibleIndices });
+            }
 
-            // 2. Unload everything outside the window to free memory
-            this.unloadPageRange(startIdx, endIdx);
+            // 2. DEFERRED: Preload neighbors (Smart Preloading)
+            // Cancel any pending preload
+            if (this.preloadTimer) clearTimeout(this.preloadTimer);
+
+            this.preloadAll();
+            // this.preloadNeighbors(currentPage);
 
             persistentLog.add('📖', 'Flipping', {
                 page: currentPage,
-                window: `${startIdx + 1}-${endIdx + 1}`,
-                totalLoaded: this.pages.filter(p => !p.startsWith('data:')).length
+                loadedValues: this.pages.filter(p => p && !p.startsWith('data:')).length
             });
 
             // Log memory usage
@@ -595,20 +583,69 @@ const app = createApp({
                 persistentLog.add('💾', 'Memory', { usedMB, page: currentPage });
             }
 
-            // Auto zoom out when flipping pages to avoid zoom-related rendering glitches
-            if (this.$refs.flipbook && this.$refs.flipbook.canZoomOut) {
-                this.$refs.flipbook.zoomOut();
+            // Sync Flipbook component state (required for deep linking/hash changes)
+            // if (this.$refs.flipbook && typeof this.$refs.flipbook.goToPage === 'function') {
+            //     this.$refs.flipbook.goToPage(currentPage);
+            // }
+        },
+
+        preloadAll() {
+            let preloaded = 0;
+            this.pages.forEach((p, i) => {
+                if (!p) {
+                    this.pages.splice(i, 1, this.allPageUrls[i]);
+                    preloaded++;
+                }
+            });
+
+            persistentLog.add('🔄', `Preloaded all pages: ${preloaded} pages loaded`);
+        },
+
+        preloadNeighbors(centerPage) {
+            // Preload strategy:
+            // Keep: Current Spread
+            // Load: Next Spread (1-2 pages)
+            // Load: Prev Spread (1-2 pages)
+            // Load: Always first page (0)
+
+            const visible = this.getVisibleIndices(centerPage);
+            persistentLog.add('🔄', `Visible indices ${visible}`);
+            const toKeep = new Set(visible);
+
+            // Add Next Spread
+            const nextSpreadIndices = this.getVisibleIndices(centerPage + 2);
+            nextSpreadIndices.forEach(i => toKeep.add(i));
+
+            // Add Prev Spread
+            const prevSpreadIndices = this.getVisibleIndices(centerPage - 2);
+            prevSpreadIndices.forEach(i => toKeep.add(i));
+
+            // Always keep first page
+            toKeep.add(0)
+            persistentLog.add('🔄', `Indices to keep: ${Array.from(toKeep)}`);
+
+            // Execute Loading
+            let preloaded = 0;
+            toKeep.forEach(i => {
+                if (i >= 0 && i < this.allPageUrls.length) {
+                    if (!this.pages[i]) {
+                        this.pages.splice(i, 1, this.allPageUrls[i]);
+                        preloaded++;
+                    }
+                }
+            });
+
+            if (preloaded > 0) {
+                persistentLog.add('🔄', `Preloaded ${preloaded} neighbor pages`);
             }
 
-            // Sync Flipbook component state (required for deep linking/hash changes)
-            if (this.$refs.flipbook && typeof this.$refs.flipbook.goToPage === 'function') {
-                this.$refs.flipbook.goToPage(currentPage);
-            }
+            // Optional: Unload distant pages to save memory?
+            // For now, let's keep it simple and additive as per browser cache.
+            // If memory is an issue, we can enable unloading later.
+            // this.unloadDistant(toKeep);
         }
     },
     render() {
-        console.log('Render called - loading:', this.loading, 'error:', this.error, 'pages.length:', this.pages.length);
-
         if (this.loading) {
             return h('div', { class: 'loading-container' }, [
                 h('div', { class: 'loading-spinner' }),
@@ -637,47 +674,37 @@ const app = createApp({
         if (this.pages.length > 0) {
             console.log('Rendering flipbook with pages:', this.pages.length);
 
-            // Detect mobile device
-            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
             return h('div', { style: { backgroundColor: this.backgroundColor, width: '100%', height: '100%', position: 'relative' } }, [
                 h(Flipbook, {
                     class: 'flipbook',
                     pages: this.pages,
-
                     ambient: 1,
                     clickToZoom: true,
                     startPage: this.currentPage,
                     ref: 'flipbook',
                     onFlipLeftStart: (page) => {
                         persistentLog.add('◀️', 'Flip Left Start', { from: page });
-                        // Don't manually update state here; let slotProps/end-event handle it
-                        // this.onFlipStart(Math.max(1, page - 1));
                     },
                     onFlipRightStart: (page) => {
                         persistentLog.add('▶️', 'Flip Right Start', { from: page });
-                        // Don't manually update state here; let slotProps/end-event handle it
-                        // this.onFlipStart(Math.min(this.allPageUrls.length, page + 1));
                     },
                     // End events to ensure final state is caught
                     onFlipLeftEnd: (page) => {
                         persistentLog.add('◀️', 'Flip Left End', { to: page });
-                        this.onFlipStart(page);
+                        // this.$nextTick(() => {
+                        //     this.updatePagesAround(page);
+                        // });
                     },
                     onFlipRightEnd: (page) => {
                         persistentLog.add('▶️', 'Flip Right End', { to: page });
-                        this.onFlipStart(page);
+                        // this.$nextTick(() => {
+                        //     this.updatePagesAround(page);
+                        // });
                     }
                 }, {
                     default: (slotProps) => {
-                        // CRITICAL: Synchronize internal state with slot property
-                        // Use isInitialized guard to prevent overwriting initial startPage
-                        if (this.isInitialized && slotProps.page && slotProps.page !== this.currentPage) {
-                            this.currentPage = slotProps.page;
-                            // Update window for the new page
-                            // Use a slight delay to avoid conflicts during flip
-                            setTimeout(() => this.onFlipStart(slotProps.page), 0);
-                        }
+                        persistentLog.add('🔄', `this.pages`, this.pages);
+                        persistentLog.add('🔄', `slotProps`, slotProps);
 
                         // DEBUG: Monitor scroll dimensions during interactions
                         if (this.isInitialized && slotProps.canZoomOut) {
