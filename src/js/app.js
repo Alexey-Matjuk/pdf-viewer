@@ -464,8 +464,6 @@ const app = createApp({
             const hashPage = parseInt(window.location.hash.replace('#', ''));
             if (!isNaN(hashPage) && hashPage > 0 && hashPage !== this.currentPage) {
                 this.currentPage = hashPage;
-                // Trigger loading logic for the new page
-                // this.updatePagesAround(hashPage);
             }
         },
         onKeyDown(e) {
@@ -582,11 +580,6 @@ const app = createApp({
                 const usedMB = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
                 persistentLog.add('💾', 'Memory', { usedMB, page: currentPage });
             }
-
-            // Sync Flipbook component state (required for deep linking/hash changes)
-            // if (this.$refs.flipbook && typeof this.$refs.flipbook.goToPage === 'function') {
-            //     this.$refs.flipbook.goToPage(currentPage);
-            // }
         },
 
         preloadAll() {
@@ -691,21 +684,12 @@ const app = createApp({
                     // End events to ensure final state is caught
                     onFlipLeftEnd: (page) => {
                         persistentLog.add('◀️', 'Flip Left End', { to: page });
-                        // this.$nextTick(() => {
-                        //     this.updatePagesAround(page);
-                        // });
                     },
                     onFlipRightEnd: (page) => {
                         persistentLog.add('▶️', 'Flip Right End', { to: page });
-                        // this.$nextTick(() => {
-                        //     this.updatePagesAround(page);
-                        // });
                     }
                 }, {
                     default: (slotProps) => {
-                        persistentLog.add('🔄', `this.pages`, this.pages);
-                        persistentLog.add('🔄', `slotProps`, slotProps);
-
                         // DEBUG: Monitor scroll dimensions during interactions
                         if (this.isInitialized && slotProps.canZoomOut) {
                             const viewport = this.$refs.flipbook?.$refs?.viewport;
